@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOH HIV Platform - Login</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="60" height="60" rx="10" fill="#2563eb"/>
+                        <path d="M30 15L20 25H26V35H22V45H30V35H34V45H42V35H38V25H44L30 15Z" fill="white"/>
+                    </svg>
+                </div>
+                <h1>DOH HIV Platform</h1>
+                <p>Unified Health Information Management System</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="role">Login As</label>
+                    <select id="role" name="role" required>
+                        <option value="">Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="case_manager">Case Manager</option>
+                        <option value="nurse">Nurse</option>
+                        <option value="physician">Physician</option>
+                        <option value="lab_personnel">Lab Personnel</option>
+                        <option value="patient">Patient</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="Enter username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter password">
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                
+                <div class="login-help">
+                    <p><strong>Demo Credentials:</strong></p>
+                    <ul>
+                        <li><strong>Admin:</strong> admin / admin123</li>
+                        <li><strong>Physician:</strong> physician / doc123</li>
+                        <li><strong>Nurse:</strong> nurse / nurse123</li>
+                        <li><strong>Case Manager:</strong> case_manager / case123</li>
+                        <li><strong>Lab Personnel:</strong> lab_personnel / lab123</li>
+                        <li><strong>Patient:</strong> patient / pat123</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-size: 12px;">
+                        📖 See <strong>USER_GUIDE.md</strong> for complete instructions
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="js/mockData.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const role = document.getElementById('role').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (Auth.login(username, password, role)) {
+                window.location.href = 'dashboard.html';
+            } else {
+                alert('Invalid credentials. Please check demo credentials.');
+            }
+        });
+    </script>
+</body>
+</html>
+

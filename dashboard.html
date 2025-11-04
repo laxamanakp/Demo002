@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOH HIV Platform - Dashboard</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-small">
+                    <svg width="40" height="40" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="60" height="60" rx="10" fill="#2563eb"/>
+                        <path d="M30 15L20 25H26V35H22V45H30V35H34V45H42V35H38V25H44L30 15Z" fill="white"/>
+                    </svg>
+                </div>
+                <h2>DOH HIV</h2>
+            </div>
+            
+            <nav class="sidebar-nav" id="sidebarNav">
+                <!-- Dynamic navigation will be loaded here -->
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="btn btn-secondary btn-block" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="btn-icon" id="menuToggle">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 12h18M3 6h18M3 18h18" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    <h1 id="pageTitle">Dashboard</h1>
+                </div>
+                
+                <div class="topbar-right">
+                    <button class="btn-icon notification-btn" id="notificationBtn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span class="badge" id="notificationCount">0</span>
+                    </button>
+                    
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">
+                            <span id="userInitials">--</span>
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <span class="user-role" id="userRole">Role</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Dynamic Content Area -->
+            <div class="content-wrapper" id="contentArea">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </main>
+    </div>
+    
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+        <div class="notification-header">
+            <h3>Notifications</h3>
+            <button class="btn-close" id="closeNotifications">×</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <!-- Notifications will be loaded here -->
+        </div>
+    </div>
+    
+    <!-- Modal Container -->
+    <div id="modalContainer"></div>
+    
+    <!-- Scripts -->
+    <script src="js/mockData.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/appointments.js"></script>
+    <script src="js/patients.js"></script>
+    <script src="js/prescriptions.js"></script>
+    <script src="js/reminders.js"></script>
+    <script src="js/education.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/arpa.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/visits.js"></script>
+    <script src="js/art-regimen.js"></script>
+    <script src="js/hts.js"></script>
+    <script src="js/counseling.js"></script>
+    <script src="js/surveys.js"></script>
+    
+    <script>
+        // Initialize app on page load
+        if (!Auth.isAuthenticated()) {
+            window.location.href = 'index.html';
+        } else {
+            App.init();
+        }
+    </script>
+</body>
+</html>
+
