@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Patient Profile Management CRUD
+// MyHubCares - Patient Profile Management CRUD
 // ============================================================
 
 const Patients = {

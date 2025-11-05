@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Health Education Resources
+// MyHubCares - Health Education Resources
 // ============================================================
 
 const Education = {

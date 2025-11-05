@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Clinical Visit Management
+// MyHubCares - Clinical Visit Management
 // ============================================================
 
 const Visits = {

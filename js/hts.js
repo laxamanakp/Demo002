@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - HIV Testing Services (HTS)
+// MyHubCares - HIV Testing Services (HTS)
 // ============================================================
 
 const HTS = {

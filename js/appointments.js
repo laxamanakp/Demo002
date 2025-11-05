@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Appointment Management CRUD
+// MyHubCares - Appointment Management CRUD
 // ============================================================
 
 const Appointments = {

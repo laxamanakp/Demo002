@@ -1,4 +1,9 @@
-# DOH HIV Platform - User Guide
+# MyHubCares - User Guide
+
+**Welcome Home!** This is your complete guide to using the MyHubCares healthcare management system.
+
+**Website**: [www.myhubcares.com](https://www.myhubcares.com/)  
+**Contact**: 0917-187-CARE (2273) - Ortigas Main
 
 ## Quick Start Guide
 

@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Counseling Sessions Management
+// MyHubCares - Counseling Sessions Management
 // ============================================================
 
 const Counseling = {

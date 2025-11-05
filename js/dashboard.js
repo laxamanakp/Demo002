@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Healthcare Worker Dashboard
+// MyHubCares - Healthcare Worker Dashboard
 // ============================================================
 
 const Dashboard = {

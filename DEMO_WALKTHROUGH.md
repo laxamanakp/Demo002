@@ -1,4 +1,6 @@
-# DOH HIV Platform - 5-Minute Demo Walkthrough Script
+# MyHubCares - 5-Minute Demo Walkthrough Script
+
+**"It's my hub, and it's yours" - Welcome Home!**
 
 ## 🎯 **Quick Demo Script for Stakeholders**
 
@@ -6,7 +8,7 @@
 
 ## **INTRODUCTION (30 seconds)**
 
-> "Good day! I'm pleased to present the DOH HIV Platform - a comprehensive healthcare management system with 19 integrated modules, full RBAC for 6 user roles, and 95% feature completion. This is a fully functional frontend demo showcasing all critical healthcare workflows."
+> "Good day! I'm pleased to present MyHubCares - Metro Manila's premier sexual health and wellness management platform. We've developed a comprehensive system with 19 integrated modules, full RBAC for 6 user roles, and 95% feature completion. MyHubCares serves patients at our Ortigas, Pasay, and Alabang clinics with a family-oriented, client-centered approach."
 
 **Show**: Login page with 6 roles listed
 
@@ -197,7 +199,7 @@
   - Low stock alerts
   - High-risk patients panel
 
-> "The DOH HIV Platform integrates all aspects of HIV care - from initial testing to long-term treatment monitoring - with AI-powered risk prediction, comprehensive reporting, and patient engagement tools. All 17 required modules are implemented and functional."
+> "MyHubCares integrates all aspects of sexual health and HIV care - from initial testing to long-term treatment monitoring - with AI-powered risk prediction, comprehensive reporting, and patient engagement tools. We create a safe, welcoming environment where clients feel at home. All 17 required modules are implemented and functional, ready to serve our community across Metro Manila."
 
 ---
 

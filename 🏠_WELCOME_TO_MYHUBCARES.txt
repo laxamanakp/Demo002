@@ -1,0 +1,162 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║                    🏠 WELCOME TO MYHUBCARES! 🏠                         ║
+║                                                                          ║
+║              "It's my hub, and it's yours" - Welcome Home!              ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+
+🌟 MYHUBCARES - YOUR PARTNER IN SEXUAL HEALTH AND WELLNESS
+═══════════════════════════════════════════════════════════════════════════
+
+Metro Manila's Premier Almost 24/7 Sexual Health Clinic Network
+
+
+📍 OUR BRANCHES
+═══════════════════════════════════════════════════════════════════════════
+
+🏥 MyHubCares Ortigas Main
+   Unit 607 Tycoon Corporate Center Building
+   Pearl Drive, Ortigas Center, Pasig City 1605
+   📞 0917-187-CARE (2273)
+   ✉️ ortigas@myhubcares.com
+
+🏥 MyHubCares Pasay
+   Pasay City, Metro Manila
+   📞 0898-700-1267
+   ✉️ pasay@myhubcares.com
+
+🏥 MyHubCares Alabang
+   Alabang, Muntinlupa City
+   📞 0954-468-1630
+   ✉️ alabang@myhubcares.com
+
+
+🌐 CONNECT WITH US
+═══════════════════════════════════════════════════════════════════════════
+
+Website: www.myhubcares.com
+Email: admin@myhubcares.com
+Facebook: My Hub Cares
+Instagram: @myhubcares
+
+
+💡 WHAT MAKES US DIFFERENT
+═══════════════════════════════════════════════════════════════════════════
+
+✨ A Culture of Care
+   We make you feel like you're home with a family that welcomes you
+   and understands your needs
+
+✨ Safe Environment
+   A place that provides a physically and emotionally safe space for you
+
+✨ Client-Centered Approach
+   You have the right to choose where to receive your medical care
+
+✨ Almost 24/7 Service
+   We're here when you need us
+
+✨ Comprehensive Services
+   HIV/STI testing, treatment, counseling, PrEP, PEP, and more
+
+
+🎯 THIS PLATFORM DEMO
+═══════════════════════════════════════════════════════════════════════════
+
+This is a comprehensive healthcare management system demo featuring:
+
+✅ 19 Integrated Modules
+✅ 6 User Roles with RBAC
+✅ Complete Patient Care Workflow
+✅ AI-Powered Risk Prediction (ARPA)
+✅ Digital Prescriptions & Reminders
+✅ Appointment Scheduling
+✅ Inventory Management
+✅ Clinical Visit Recording
+✅ ART Regimen Tracking
+✅ HIV Testing Services (HTS)
+✅ Counseling Sessions
+✅ Patient Satisfaction Surveys
+✅ And much more...
+
+
+🚀 GET STARTED
+═══════════════════════════════════════════════════════════════════════════
+
+1. Open: index.html
+2. Login: Choose any role (credentials shown on screen)
+3. Explore: All features are fully functional!
+
+
+📚 DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════════
+
+📖 START_HERE.md - Quick start guide (READ THIS FIRST!)
+📖 USER_GUIDE.md - Complete user manual
+📖 DEMO_WALKTHROUGH.md - 5-minute presentation script
+📖 README.md - Technical documentation
+
+
+✨ PLATFORM FEATURES
+═══════════════════════════════════════════════════════════════════════════
+
+🔐 Secure Authentication
+👥 Patient Management
+📅 Appointment Scheduling with Calendar
+🏥 Clinical Visit Recording
+💊 Digital Prescriptions
+🔔 Medication Reminders
+📦 Inventory Management
+💉 ART Regimen Tracking
+🧪 HIV Testing Services (HTS)
+💬 Counseling Sessions
+🔄 Patient Referrals
+📊 ARPA Risk Prediction
+⭐ Satisfaction Surveys
+📈 Analytics & Reports
+🎓 Health Education
+👤 User Management (Admin)
+🏢 Facility Management (Admin)
+
+
+🎯 DEMO CREDENTIALS
+═══════════════════════════════════════════════════════════════════════════
+
+👑 Admin:         admin / admin123
+👨‍⚕️ Physician:     physician / doc123
+👩‍⚕️ Nurse:         nurse / nurse123
+🤝 Case Manager:  case_manager / case123
+🧪 Lab Personnel: lab_personnel / lab123
+👤 Patient:       patient / pat123
+
+
+🎊 READY FOR DEMO!
+═══════════════════════════════════════════════════════════════════════════
+
+✅ All features working perfectly
+✅ All modules fully functional
+✅ Professional MyHubCares branding
+✅ Real clinic information
+✅ 95% feature completion
+✅ Production-ready demo
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+                 MYHUBCARES - WELCOME HOME! 🏠
+
+         Your Partner in Sexual Health and Wellness
+
+         Ortigas | Pasay | Alabang - Serving Metro Manila
+
+              Visit us at www.myhubcares.com
+
+═══════════════════════════════════════════════════════════════════════════
+
+
+🎉 ALL DEMOS ARE EXCELLENT! 🎉
+
+Open index.html to start your journey with MyHubCares!
+

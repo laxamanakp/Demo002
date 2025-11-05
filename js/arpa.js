@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Adherence Risk Prediction Algorithm (ARPA)
+// MyHubCares - Adherence Risk Prediction Algorithm (ARPA)
 // ============================================================
 
 const ARPA = {

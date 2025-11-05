@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Mock Data
+// MyHubCares - Mock Data
 // ============================================================
 
 const MockData = {
@@ -11,7 +11,7 @@ const MockData = {
             password: 'admin123',
             role: 'admin',
             fullName: 'Admin User',
-            email: 'admin@doh.gov.ph',
+            email: 'admin@myhubcares.com',
             facilityId: 1
         },
         {
@@ -20,7 +20,7 @@ const MockData = {
             password: 'doc123',
             role: 'physician',
             fullName: 'Dr. Maria Santos',
-            email: 'msantos@doh.gov.ph',
+            email: 'msantos@myhubcares.com',
             facilityId: 1
         },
         {
@@ -29,7 +29,7 @@ const MockData = {
             password: 'nurse123',
             role: 'nurse',
             fullName: 'Nurse Juan dela Cruz',
-            email: 'jdelacruz@doh.gov.ph',
+            email: 'jdelacruz@myhubcares.com',
             facilityId: 1
         },
         {
@@ -38,7 +38,7 @@ const MockData = {
             password: 'case123',
             role: 'case_manager',
             fullName: 'Anna Reyes',
-            email: 'areyes@doh.gov.ph',
+            email: 'areyes@myhubcares.com',
             facilityId: 1
         },
         {
@@ -47,7 +47,7 @@ const MockData = {
             password: 'lab123',
             role: 'lab_personnel',
             fullName: 'Lab Tech Roberto Cruz',
-            email: 'rcruz@doh.gov.ph',
+            email: 'rcruz@myhubcares.com',
             facilityId: 1
         },
         {
@@ -65,30 +65,30 @@ const MockData = {
     facilities: [
         {
             id: 1,
-            name: 'Manila General Hospital',
-            address: '123 Taft Avenue, Manila',
+            name: 'MyHubCares Ortigas Main',
+            address: 'Unit 607 Tycoon Corporate Center Building, Pearl Drive, Ortigas Center, Pasig City 1605',
             regionId: 1,
-            contactPerson: 'Dr. Jose Rizal',
-            contactNumber: '(02) 1234-5678',
-            email: 'info@mgh.gov.ph'
+            contactPerson: 'Dr. Maria Santos',
+            contactNumber: '0917-187-2273',
+            email: 'ortigas@myhubcares.com'
         },
         {
             id: 2,
-            name: 'Quezon City Health Center',
-            address: '456 Commonwealth Ave, Quezon City',
+            name: 'MyHubCares Pasay',
+            address: 'Pasay City, Metro Manila',
             regionId: 1,
-            contactPerson: 'Nurse Maria Clara',
-            contactNumber: '(02) 8765-4321',
-            email: 'info@qchc.gov.ph'
+            contactPerson: 'Nurse Juan dela Cruz',
+            contactNumber: '0898-700-1267',
+            email: 'pasay@myhubcares.com'
         },
         {
             id: 3,
-            name: 'Cebu Provincial Hospital',
-            address: '789 Osmeña Blvd, Cebu City',
-            regionId: 7,
-            contactPerson: 'Dr. Lapu-Lapu',
-            contactNumber: '(032) 111-2222',
-            email: 'info@cph.gov.ph'
+            name: 'MyHubCares Alabang',
+            address: 'Alabang, Muntinlupa City',
+            regionId: 1,
+            contactPerson: 'Dr. Anna Reyes',
+            contactNumber: '0954-468-1630',
+            email: 'alabang@myhubcares.com'
         }
     ],
 
@@ -199,7 +199,7 @@ const MockData = {
             stockQuantity: 500,
             unit: 'tablets',
             expiryDate: '2026-12-31',
-            supplier: 'DOH Central Pharmacy',
+            supplier: 'MyHubCares Pharmacy',
             reorderLevel: 100,
             lastRestocked: '2025-10-01'
         },
@@ -209,7 +209,7 @@ const MockData = {
             stockQuantity: 250,
             unit: 'tablets',
             expiryDate: '2026-08-15',
-            supplier: 'DOH Central Pharmacy',
+            supplier: 'MyHubCares Pharmacy',
             reorderLevel: 50,
             lastRestocked: '2025-09-15'
         },
@@ -219,7 +219,7 @@ const MockData = {
             stockQuantity: 80,
             unit: 'tablets',
             expiryDate: '2026-06-30',
-            supplier: 'DOH Central Pharmacy',
+            supplier: 'MyHubCares Pharmacy',
             reorderLevel: 100,
             lastRestocked: '2025-08-20'
         },
@@ -229,7 +229,7 @@ const MockData = {
             stockQuantity: 150,
             unit: 'tablets',
             expiryDate: '2027-03-15',
-            supplier: 'DOH Central Pharmacy',
+            supplier: 'MyHubCares Pharmacy',
             reorderLevel: 75,
             lastRestocked: '2025-10-10'
         },
@@ -239,7 +239,7 @@ const MockData = {
             stockQuantity: 800,
             unit: 'tablets',
             expiryDate: '2026-11-30',
-            supplier: 'DOH Central Pharmacy',
+            supplier: 'MyHubCares Pharmacy',
             reorderLevel: 200,
             lastRestocked: '2025-10-05'
         }

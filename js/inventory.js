@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Inventory Management CRUD
+// MyHubCares - Inventory Management CRUD
 // ============================================================
 
 const Inventory = {

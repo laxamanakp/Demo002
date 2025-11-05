@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - ART Regimen Management
+// MyHubCares - ART Regimen Management
 // ============================================================
 
 const ARTRegimen = {

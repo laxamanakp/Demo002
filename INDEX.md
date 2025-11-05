@@ -1,4 +1,7 @@
-# DOH HIV Platform - Complete Feature Index
+# MyHubCares - Complete Feature Index
+
+**"It's my hub, and it's yours"** - Your Partner in Sexual Health and Wellness  
+**Website**: [www.myhubcares.com](https://www.myhubcares.com/)
 
 ## 🎯 **Quick Access Guide**
 

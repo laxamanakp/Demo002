@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Calendar System
+// MyHubCares - Calendar System
 // ============================================================
 
 const Calendar = {

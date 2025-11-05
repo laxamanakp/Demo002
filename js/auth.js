@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Authentication & RBAC
+// MyHubCares - Authentication & RBAC
 // ============================================================
 
 const Auth = {

@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Digital Prescriptions
+// MyHubCares - Digital Prescriptions
 // ============================================================
 
 const Prescriptions = {
@@ -315,7 +315,7 @@ const Prescriptions = {
             <div class="prescription-template">
                 <div class="prescription-header">
                     <h1>Medical Prescription</h1>
-                    <p>${facility ? facility.name : 'DOH HIV Platform'}</p>
+                    <p>${facility ? facility.name : 'MyHubCares'}</p>
                     <p>${facility ? facility.address : ''}</p>
                 </div>
 

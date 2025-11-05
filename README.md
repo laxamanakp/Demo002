@@ -1,6 +1,10 @@
-# DOH HIV Platform - Frontend Demo
+# MyHubCares - Healthcare Management Platform
 
-A comprehensive HTML/CSS/JavaScript-based HIV healthcare management platform with role-based access control, designed for the Department of Health.
+A comprehensive HTML/CSS/JavaScript-based sexual health and wellness management platform with role-based access control. MyHubCares is Metro Manila's premier 24/7 sexual health clinic with branches in Ortigas, Pasay, and Alabang.
+
+**Website**: [www.myhubcares.com](https://www.myhubcares.com/)  
+**Contact**: 0917-187-CARE (2273) - Ortigas Main  
+**Email**: admin@myhubcares.com
 
 ## 🌟 Features
 
@@ -278,9 +282,23 @@ Risk Levels:
 - Real-time collaboration features
 - Mobile app version
 
-## 📄 License
+## 📄 About MyHubCares
 
-This is a demo project for the Department of Health (DOH) HIV Platform.
+**MyHubCares** is Metro Manila's newest and most prestigious almost 24/7 privately owned sexual health clinic network. We provide comprehensive HIV and STI services with a client-centered approach.
+
+**Our Mission**: *"It's my hub, and it's yours."* - Creating a family atmosphere where clients feel at home in a physically and emotionally safe environment.
+
+**Branches**:
+- **Ortigas Main**: Unit 607 Tycoon Corporate Center, Pearl Drive, Ortigas Center, Pasig City 1605
+- **Pasay**: Pasay City, Metro Manila  
+- **Alabang**: Alabang, Muntinlupa City
+
+**Contact**:
+- Ortigas: 0917-187-2273
+- Pasay: 0898-700-1267
+- Alabang: 0954-468-1630
+- Email: admin@myhubcares.com
+- Website: [www.myhubcares.com](https://www.myhubcares.com/)
 
 ## 🤝 Support
 
@@ -288,5 +306,10 @@ For questions or issues with the demo, please contact the development team.
 
 ---
 
-**Note**: This is a demonstration application. For production deployment, proper security measures, backend integration, and data protection compliance must be implemented.
+**Note**: This is a demonstration application for MyHubCares healthcare management system. For production deployment, proper security measures, backend integration, and data protection compliance must be implemented.
+
+---
+
+**MyHubCares** - *Welcome Home! Your Partner in Sexual Health and Wellness*  
+Visit us at [www.myhubcares.com](https://www.myhubcares.com/)
 

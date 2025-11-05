@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Main Application Logic & Routing
+// MyHubCares - Main Application Logic & Routing
 // ============================================================
 
 const App = {
@@ -195,7 +195,7 @@ const App = {
             counseling: 'Counseling Sessions',
             surveys: 'Satisfaction Surveys'
         };
-        return titles[page] || 'DOH HIV Platform';
+        return titles[page] || 'MyHubCares';
     },
 
     // Load dashboard based on role
@@ -207,7 +207,7 @@ const App = {
         } else if (Auth.permissions.canAccessWorkerDashboard(role)) {
             Dashboard.loadWorkerDashboard(container);
         } else {
-            container.innerHTML = '<div class="alert alert-info">Welcome to DOH HIV Platform</div>';
+            container.innerHTML = '<div class="alert alert-info">Welcome to MyHubCares - Your Partner in Sexual Health and Wellness</div>';
         }
     },
 

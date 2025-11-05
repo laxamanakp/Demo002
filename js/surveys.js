@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Satisfaction Surveys
+// MyHubCares - Satisfaction Surveys
 // ============================================================
 
 const Surveys = {

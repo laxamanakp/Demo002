@@ -1,5 +1,5 @@
 // ============================================================
-// DOH HIV Platform - Medication Reminder System
+// MyHubCares - Medication Reminder System
 // ============================================================
 
 const Reminders = {
