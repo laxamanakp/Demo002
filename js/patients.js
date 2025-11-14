@@ -187,11 +187,14 @@ const Patients = {
             ` : ''}
             
             <div class="tabs">
-                <div class="tab active" data-tab="demographics">Demographics</div>
-                <div class="tab" data-tab="visits">Visits (${patientVisits.length})</div>
-                <div class="tab" data-tab="prescriptions">Prescriptions (${patientPrescriptions.length})</div>
-                <div class="tab" data-tab="labs">Lab Results (${patientLabTests.length})</div>
-            </div>
+            <div class="tab active" data-tab="demographics">Demographics</div>
+            <div class="tab" data-tab="visits">Visits (${patientVisits.length})</div>
+            <div class="tab" data-tab="prescriptions">Prescriptions (${patientPrescriptions.length})</div>
+            <div class="tab" data-tab="labs">Lab Results (${patientLabTests.length})</div>
+            <div class="tab" data-tab="risk-scores">Risk Scores</div>
+            <div class="tab" data-tab="identifiers">Identifiers</div>
+            <div class="tab" data-tab="documents">Documents</div>
+        </div>
 
             <div class="tab-content active" id="demographicsTab">
                 ${this.renderDemographics(patient)}
@@ -207,6 +210,18 @@ const Patients = {
 
             <div class="tab-content" id="labsTab">
                 ${this.renderLabTests(patientLabTests)}
+            </div>
+
+            <div class="tab-content" id="risk-scoresTab">
+                ${this.renderRiskScores(patientId)}
+            </div>
+
+            <div class="tab-content" id="identifiersTab">
+                <div id="identifiersContent"></div>
+            </div>
+
+            <div class="tab-content" id="documentsTab">
+                <div id="documentsContent"></div>
             </div>
         `;
 
@@ -225,6 +240,14 @@ const Patients = {
                 });
                 
                 document.getElementById(tabName + 'Tab').classList.add('active');
+                
+                // Load content for identifiers and documents tabs
+                if (tabName === 'identifiers' && typeof PatientManagement !== 'undefined') {
+                    PatientManagement.loadPatientIdentifiersPage(document.getElementById('identifiersContent'), patient.id);
+                }
+                if (tabName === 'documents' && typeof PatientManagement !== 'undefined') {
+                    PatientManagement.loadPatientDocumentsPage(document.getElementById('documentsContent'), patient.id);
+                }
             });
         });
     },
@@ -373,6 +396,90 @@ const Patients = {
                         `).join('')}
                     </tbody>
                 </table>
+            </div>
+        `;
+    },
+
+    // Render risk scores tab
+    renderRiskScores(patientId) {
+        const riskScores = JSON.parse(localStorage.getItem('patient_risk_scores')) || [];
+        const patientRiskScores = riskScores.filter(r => r.patient_id === patientId)
+            .sort((a, b) => new Date(b.calculated_on) - new Date(a.calculated_on));
+
+        if (patientRiskScores.length === 0) {
+            return '<p class="text-muted">No risk score history found. Risk scores are calculated automatically when viewing patient details.</p>';
+        }
+
+        const getRiskLevel = (score) => {
+            if (score >= 75) return { level: 'Critical', class: 'danger' };
+            if (score >= 50) return { level: 'High', class: 'warning' };
+            if (score >= 25) return { level: 'Medium', class: 'info' };
+            return { level: 'Low', class: 'success' };
+        };
+
+        return `
+            <div class="risk-scores-timeline">
+                ${patientRiskScores.map(risk => {
+                    const riskInfo = getRiskLevel(risk.score);
+                    const riskFactors = typeof risk.risk_factors === 'string' 
+                        ? JSON.parse(risk.risk_factors) 
+                        : risk.risk_factors;
+                    
+                    return `
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-between align-center">
+                                <div>
+                                    <strong>${new Date(risk.calculated_on).toLocaleDateString()}</strong>
+                                    <span class="badge badge-${riskInfo.class} ml-2">${riskInfo.level} Risk</span>
+                                </div>
+                                <div>
+                                    <strong class="text-${riskInfo.class}">Score: ${risk.score}/100</strong>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <h5>Risk Factors</h5>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Missed Medications</label>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" style="width: ${riskFactors.missedMedications || 0}%; background: ${riskFactors.missedMedications > 30 ? '#dc3545' : riskFactors.missedMedications > 15 ? '#ffc107' : '#28a745'};"></div>
+                                                <span>${riskFactors.missedMedications || 0}/100</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Missed Appointments</label>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" style="width: ${riskFactors.missedAppointments || 0}%; background: ${riskFactors.missedAppointments > 20 ? '#dc3545' : riskFactors.missedAppointments > 10 ? '#ffc107' : '#28a745'};"></div>
+                                                <span>${riskFactors.missedAppointments || 0}/100</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Lab Compliance</label>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" style="width: ${riskFactors.labCompliance || 0}%; background: ${riskFactors.labCompliance > 15 ? '#dc3545' : riskFactors.labCompliance > 8 ? '#ffc107' : '#28a745'};"></div>
+                                                <span>${riskFactors.labCompliance || 0}/100</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Time Since Last Visit</label>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" style="width: ${riskFactors.timeSinceLastVisit || 0}%; background: ${riskFactors.timeSinceLastVisit > 10 ? '#dc3545' : riskFactors.timeSinceLastVisit > 5 ? '#ffc107' : '#28a745'};"></div>
+                                                <span>${riskFactors.timeSinceLastVisit || 0}/100</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5>Recommendations</h5>
+                                    <p>${risk.recommendations || 'No specific recommendations.'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
             </div>
         `;
     },

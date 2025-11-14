@@ -36,13 +36,37 @@ const ARPA = {
         else if (totalScore >= 50) level = 'high';
         else if (totalScore >= 25) level = 'medium';
 
-        return {
+        const riskScore = {
             score: totalScore,
             level: level,
             adherenceRate: adherenceRate,
             components: scores,
             recommendations: this.generateRecommendations(level, scores)
         };
+
+        // Save to patient_risk_scores table
+        this.saveRiskScore(patientId, riskScore);
+
+        return riskScore;
+    },
+
+    // Save risk score to patient_risk_scores table
+    saveRiskScore(patientId, riskScore) {
+        const riskScores = JSON.parse(localStorage.getItem('patient_risk_scores')) || [];
+        const currentUser = Auth.getCurrentUser();
+
+        const newRiskScore = {
+            risk_score_id: 'risk_' + Date.now(),
+            patient_id: patientId,
+            score: riskScore.score,
+            calculated_on: new Date().toISOString().split('T')[0],
+            risk_factors: JSON.stringify(riskScore.components),
+            recommendations: riskScore.recommendations,
+            calculated_by: currentUser ? currentUser.userId : null
+        };
+
+        riskScores.push(newRiskScore);
+        localStorage.setItem('patient_risk_scores', JSON.stringify(riskScores));
     },
 
     // Score missed medications (0-100, higher is worse)

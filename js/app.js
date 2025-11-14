@@ -129,7 +129,11 @@ const App = {
                 break;
             case 'lab-tests':
             case 'lab-results':
-                this.loadLabTestsPage(contentArea);
+                if (typeof LabTests !== 'undefined') {
+                    LabTests.loadLabTestsPage(contentArea);
+                } else {
+                    this.loadLabTestsPage(contentArea);
+                }
                 break;
             case 'reminders':
                 Reminders.loadRemindersPage(contentArea);
@@ -172,6 +176,36 @@ const App = {
                 break;
             case 'audit':
                 AuditTrail.loadAuditPage(contentArea);
+                break;
+            case 'rbac':
+                if (typeof RBAC !== 'undefined') RBAC.loadRBACPage(contentArea);
+                break;
+            case 'medication-tracking':
+                if (typeof MedicationTracking !== 'undefined') MedicationTracking.loadDispenseEventsPage(contentArea);
+                break;
+            case 'adherence':
+                if (typeof MedicationTracking !== 'undefined') MedicationTracking.loadAdherencePage(contentArea);
+                break;
+            case 'availability-slots':
+                if (typeof AppointmentManagement !== 'undefined') AppointmentManagement.loadAvailabilitySlotsPage(contentArea);
+                break;
+            case 'appointment-reminders':
+                if (typeof AppointmentManagement !== 'undefined') AppointmentManagement.loadAppointmentRemindersPage(contentArea);
+                break;
+            case 'care-tasks':
+                if (typeof CareTasks !== 'undefined') CareTasks.loadCareTasksPage(contentArea);
+                break;
+            case 'reporting':
+                if (typeof Reporting !== 'undefined') Reporting.loadReportingPage(contentArea);
+                break;
+            case 'system-admin':
+                if (typeof SystemAdmin !== 'undefined') SystemAdmin.loadSystemAdminPage(contentArea);
+                break;
+            case 'inventory-advanced':
+                if (typeof InventoryAdvanced !== 'undefined') InventoryAdvanced.loadAdvancedInventoryPage(contentArea);
+                break;
+            case 'medication-catalog':
+                if (typeof MedicationCatalog !== 'undefined') MedicationCatalog.loadMedicationCatalogPage(contentArea);
                 break;
             default:
                 contentArea.innerHTML = '<div class="alert alert-warning">Page not found</div>';

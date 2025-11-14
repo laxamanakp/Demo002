@@ -83,6 +83,11 @@ const Prescriptions = {
                             <button class="btn btn-sm btn-outline" onclick="Prescriptions.printPrescription(${rx.id})">
                                 Print
                             </button>
+                            ${(role === 'nurse' || role === 'admin') ? `
+                            <button class="btn btn-sm btn-primary" onclick="Prescriptions.showDispenseModal(${rx.id})">
+                                Dispense
+                            </button>
+                            ` : ''}
                         </div>
                     </div>
                     <div class="card-body">
@@ -153,8 +158,17 @@ const Prescriptions = {
                 <div id="drugsContainer">
                     <div class="drug-item card p-2 mb-2">
                         <div class="form-group">
-                            <label class="required">Drug Name</label>
-                            <input type="text" class="drugName" required>
+                            <label class="required">Medication</label>
+                            <select class="medicationSelect" required>
+                                <option value="">Select Medication</option>
+                                ${(() => {
+                                    const medications = JSON.parse(localStorage.getItem('medications')) || [];
+                                    return medications.filter(m => m.active).map(m => 
+                                        `<option value="${m.medication_id}" data-name="${m.medication_name}">${m.medication_name}${m.generic_name ? ' (' + m.generic_name + ')' : ''}${m.strength ? ' - ' + m.strength : ''}</option>`
+                                    ).join('');
+                                })()}
+                            </select>
+                            <small class="text-muted">Or <a href="#" onclick="App.loadPage('medication-catalog'); App.closeModal();">add new medication</a></small>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -205,6 +219,9 @@ const Prescriptions = {
     // Add drug field
     addDrugField() {
         const container = document.getElementById('drugsContainer');
+        const medications = JSON.parse(localStorage.getItem('medications')) || [];
+        const activeMedications = medications.filter(m => m.active);
+        
         const drugItem = document.createElement('div');
         drugItem.className = 'drug-item card p-2 mb-2';
         drugItem.innerHTML = `
@@ -213,8 +230,14 @@ const Prescriptions = {
                 <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()">×</button>
             </div>
             <div class="form-group">
-                <label class="required">Drug Name</label>
-                <input type="text" class="drugName" required>
+                <label class="required">Medication</label>
+                <select class="medicationSelect" required>
+                    <option value="">Select Medication</option>
+                    ${activeMedications.map(m => 
+                        `<option value="${m.medication_id}" data-name="${m.medication_name}">${m.medication_name}${m.generic_name ? ' (' + m.generic_name + ')' : ''}${m.strength ? ' - ' + m.strength : ''}</option>`
+                    ).join('')}
+                </select>
+                <small class="text-muted">Or <a href="#" onclick="App.loadPage('medication-catalog'); App.closeModal();">add new medication</a></small>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -251,9 +274,17 @@ const Prescriptions = {
         // Collect drug data
         const drugItems = document.querySelectorAll('.drug-item');
         const drugs = [];
+        const medications = JSON.parse(localStorage.getItem('medications')) || [];
+        
         drugItems.forEach(item => {
+            const medicationSelect = item.querySelector('.medicationSelect');
+            const medicationId = medicationSelect.value;
+            const medication = medications.find(m => m.medication_id === medicationId);
+            const drugName = medication ? medication.medication_name : medicationSelect.options[medicationSelect.selectedIndex]?.dataset.name || '';
+            
             drugs.push({
-                drugName: item.querySelector('.drugName').value,
+                medication_id: medicationId || null,
+                drugName: drugName,
                 dosage: item.querySelector('.dosage').value,
                 frequency: item.querySelector('.frequency').value,
                 duration: item.querySelector('.duration').value,
@@ -426,6 +457,86 @@ const Prescriptions = {
             </html>
         `);
         printWindow.document.close();
+    },
+
+    // Show dispense modal
+    showDispenseModal(prescriptionId) {
+        const prescriptions = JSON.parse(localStorage.getItem('prescriptions')) || [];
+        const prescription = prescriptions.find(p => p.id === prescriptionId);
+        
+        if (!prescription) {
+            App.showError('Prescription not found');
+            return;
+        }
+
+        const content = `
+            <form id="dispenseForm">
+                <input type="hidden" id="prescriptionId" value="${prescriptionId}">
+                <div class="form-group">
+                    <label class="required">Quantity to Dispense</label>
+                    <input type="number" id="quantityDispensed" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Batch Number</label>
+                    <input type="text" id="batchNumber" placeholder="e.g., BATCH-2024-001">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="dispenseNotes" rows="2" placeholder="Dispensing notes..."></textarea>
+                </div>
+            </form>
+        `;
+
+        const footer = `
+            <button class="btn btn-secondary" onclick="App.closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="Prescriptions.dispenseMedication()">Dispense</button>
+        `;
+
+        App.showModal('Dispense Medication', content, footer);
+    },
+
+    // Dispense medication
+    dispenseMedication() {
+        const form = document.getElementById('dispenseForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const prescriptions = JSON.parse(localStorage.getItem('prescriptions')) || [];
+        const prescriptionId = parseInt(document.getElementById('prescriptionId').value);
+        const prescription = prescriptions.find(p => p.id === prescriptionId);
+        
+        if (!prescription) {
+            App.showError('Prescription not found');
+            return;
+        }
+
+        const dispenseEvents = JSON.parse(localStorage.getItem('dispense_events')) || [];
+        const currentUser = Auth.getCurrentUser();
+
+        const newDispense = {
+            dispense_id: 'disp_' + Date.now(),
+            prescription_id: prescriptionId,
+            prescription_item_id: null,
+            nurse_id: currentUser.userId,
+            facility_id: prescription.facilityId,
+            dispensed_date: new Date().toISOString().split('T')[0],
+            quantity_dispensed: parseInt(document.getElementById('quantityDispensed').value),
+            batch_number: document.getElementById('batchNumber').value.trim() || null,
+            notes: document.getElementById('dispenseNotes').value.trim() || null,
+            created_at: new Date().toISOString()
+        };
+
+        // Add patient_id to dispense event
+        newDispense.patient_id = prescription.patientId;
+
+        dispenseEvents.push(newDispense);
+        localStorage.setItem('dispense_events', JSON.stringify(dispenseEvents));
+        
+        App.closeModal();
+        App.showSuccess('Medication dispensed successfully');
+        App.loadPage('prescriptions');
     }
 };
 

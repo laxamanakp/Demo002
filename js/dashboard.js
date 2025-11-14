@@ -3,6 +3,56 @@
 // ============================================================
 
 const Dashboard = {
+    // Cache management
+    getCache(widgetId, parameters) {
+        const cache = JSON.parse(localStorage.getItem('dashboard_cache')) || [];
+        const now = new Date();
+        
+        const cached = cache.find(c => 
+            c.widget_id === widgetId &&
+            JSON.stringify(c.parameters) === JSON.stringify(parameters) &&
+            new Date(c.expires_at) > now
+        );
+        
+        return cached ? JSON.parse(cached.cached_data) : null;
+    },
+
+    setCache(widgetId, parameters, data, expiresInHours = 12) {
+        const cache = JSON.parse(localStorage.getItem('dashboard_cache')) || [];
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000);
+        
+        // Remove expired entries
+        const activeCache = cache.filter(c => new Date(c.expires_at) > now);
+        
+        // Remove existing entry for same widget/parameters
+        const filtered = activeCache.filter(c => 
+            !(c.widget_id === widgetId && JSON.stringify(c.parameters) === JSON.stringify(parameters))
+        );
+        
+        // Add new cache entry
+        filtered.push({
+            cache_id: 'cache_' + Date.now(),
+            widget_id: widgetId,
+            parameters: typeof parameters === 'string' ? JSON.parse(parameters) : parameters,
+            cached_data: typeof data === 'string' ? data : JSON.stringify(data),
+            cached_at: now.toISOString(),
+            expires_at: expiresAt.toISOString()
+        });
+        
+        localStorage.setItem('dashboard_cache', JSON.stringify(filtered));
+    },
+
+    clearCache(widgetId = null) {
+        if (widgetId) {
+            const cache = JSON.parse(localStorage.getItem('dashboard_cache')) || [];
+            const filtered = cache.filter(c => c.widget_id !== widgetId);
+            localStorage.setItem('dashboard_cache', JSON.stringify(filtered));
+        } else {
+            localStorage.removeItem('dashboard_cache');
+        }
+    },
+
     // Load worker dashboard
     loadWorkerDashboard(container) {
         const role = Auth.getCurrentUser().role;
@@ -340,6 +390,11 @@ const Dashboard = {
 
     // Render patient enrollment chart
     renderPatientEnrollmentChart() {
+        const params = { period: 'monthly' };
+        const cached = this.getCache('patient_enrollment', params);
+        if (cached) {
+            return this.renderCachedChart(cached, 'Patient Enrollment');
+        }
         const patients = JSON.parse(localStorage.getItem('patients')) || [];
         const months = [];
         const now = new Date();
@@ -425,6 +480,23 @@ const Dashboard = {
 
     // Render risk distribution chart
     renderRiskDistributionChart() {
+        const params = {};
+        const cached = this.getCache('risk_distribution', params);
+        if (cached) {
+            const data = [
+                { label: 'Low', value: cached.low || 5 },
+                { label: 'Medium', value: cached.medium || 3 },
+                { label: 'High', value: cached.high || 2 },
+                { label: 'Critical', value: cached.critical || 1 }
+            ].filter(d => d.value > 0);
+            return Charts.generatePieChart(data, {
+                width: 300,
+                height: 300,
+                colors: ['#10b981', '#f59e0b', '#ef4444', '#dc2626'],
+                showLegend: true
+            });
+        }
+
         const patients = JSON.parse(localStorage.getItem('patients')) || [];
         const riskCounts = { low: 0, medium: 0, high: 0, critical: 0 };
 
@@ -432,6 +504,9 @@ const Dashboard = {
             const riskScore = ARPA.calculateRiskScore(patient.id);
             riskCounts[riskScore.level] = (riskCounts[riskScore.level] || 0) + 1;
         });
+
+        // Cache the result
+        this.setCache('risk_distribution', params, riskCounts, 12);
 
         const data = [
             { label: 'Low', value: riskCounts.low || 5 },

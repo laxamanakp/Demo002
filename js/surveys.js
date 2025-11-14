@@ -96,6 +96,9 @@ const Surveys = {
         `;
 
         container.innerHTML = html;
+        
+        // Calculate and store survey metrics
+        this.calculateAndStoreMetrics();
     },
 
     // Calculate average satisfaction
@@ -119,6 +122,91 @@ const Surveys = {
         }).length;
         
         return Math.round((satisfiedCount / surveys.length) * 100);
+    },
+
+    // Calculate and store aggregated survey metrics
+    calculateAndStoreMetrics() {
+        const surveys = JSON.parse(localStorage.getItem('satisfactionSurveys')) || [];
+        const existingMetrics = JSON.parse(localStorage.getItem('survey_metrics')) || [];
+        
+        if (surveys.length === 0) return;
+
+        // Group surveys by facility and month
+        const grouped = {};
+        surveys.forEach(survey => {
+            const date = new Date(survey.submittedAt || survey.date);
+            const monthStart = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+            const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+            const key = `${survey.facilityId || 'all'}_${monthStart}`;
+            
+            if (!grouped[key]) {
+                grouped[key] = {
+                    facility_id: survey.facilityId || null,
+                    period_start: monthStart,
+                    period_end: monthEnd,
+                    surveys: []
+                };
+            }
+            grouped[key].surveys.push(survey);
+        });
+
+        // Calculate metrics for each group
+        Object.keys(grouped).forEach(key => {
+            const group = grouped[key];
+            const groupSurveys = group.surveys;
+            
+            // Check if metric already exists for this period
+            const existing = existingMetrics.find(m => 
+                m.facility_id === group.facility_id && 
+                m.period_start === group.period_start
+            );
+            
+            if (existing) {
+                // Update existing metric
+                const index = existingMetrics.indexOf(existing);
+                existingMetrics[index] = this.calculateMetric(group.facility_id, group.period_start, group.period_end, groupSurveys);
+            } else {
+                // Add new metric
+                existingMetrics.push(this.calculateMetric(group.facility_id, group.period_start, group.period_end, groupSurveys));
+            }
+        });
+
+        localStorage.setItem('survey_metrics', JSON.stringify(existingMetrics));
+    },
+
+    // Calculate single metric from surveys
+    calculateMetric(facilityId, periodStart, periodEnd, surveys) {
+        const totalResponses = surveys.length;
+        
+        // Calculate averages
+        const avgOverall = surveys.reduce((sum, s) => {
+            return sum + (s.q1 + s.q2 + s.q3 + s.q4 + s.q5) / 5;
+        }, 0) / totalResponses;
+        
+        const avgStaff = surveys.reduce((sum, s) => sum + s.q2, 0) / totalResponses;
+        const avgWait = surveys.reduce((sum, s) => sum + s.q3, 0) / totalResponses;
+        const avgCleanliness = surveys.reduce((sum, s) => sum + s.q4, 0) / totalResponses;
+        
+        // Calculate recommendation rate
+        const recommendedCount = surveys.filter(s => {
+            const avg = (s.q1 + s.q2 + s.q3 + s.q4 + s.q5) / 5;
+            return avg >= 3;
+        }).length;
+        const recommendationRate = (recommendedCount / totalResponses) * 100;
+
+        return {
+            metric_id: 'metric_' + Date.now() + '_' + (facilityId || 'all'),
+            facility_id: facilityId,
+            period_start: periodStart,
+            period_end: periodEnd,
+            total_responses: totalResponses,
+            average_overall: Math.round(avgOverall * 100) / 100,
+            average_staff: Math.round(avgStaff * 100) / 100,
+            average_wait: Math.round(avgWait * 100) / 100,
+            average_cleanliness: Math.round(avgCleanliness * 100) / 100,
+            recommendation_rate: Math.round(recommendationRate * 100) / 100,
+            calculated_at: new Date().toISOString()
+        };
     },
 
     // Render satisfaction chart

@@ -212,6 +212,11 @@ const Visits = {
                     <label>Assessment & Plan</label>
                     <textarea id="assessment" rows="3" placeholder="Enter assessment and treatment plan..."></textarea>
                 </div>
+
+                <h4 class="mt-3">Diagnoses & Procedures</h4>
+                <div class="alert alert-info">
+                    <small>You can add diagnoses and procedures after saving the visit.</small>
+                </div>
             </form>
         `;
 
@@ -367,6 +372,9 @@ const Visits = {
                     <textarea rows="3" readonly>${visit.assessment}</textarea>
                 </div>
             ` : ''}
+
+            ${typeof ClinicalCare !== 'undefined' ? ClinicalCare.renderDiagnosesSection(visitId) : ''}
+            ${typeof ClinicalCare !== 'undefined' ? ClinicalCare.renderProceduresSection(visitId) : ''}
         `;
 
         App.showModal('Visit Details', content, '');
