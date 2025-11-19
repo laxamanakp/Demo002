@@ -794,6 +794,10 @@
                     <div class="action-icon">🧪</div>
                     <div class="action-label">Lab Results</div>
                 </button>
+                <button class="quick-action" onclick="navigateTo('counseling')">
+                    <div class="action-icon">💬</div>
+                    <div class="action-label">Counseling</div>
+                </button>
                 <button class="quick-action" onclick="navigateTo('feedback')">
                     <div class="action-icon">⭐</div>
                     <div class="action-label">Feedback</div>
@@ -941,6 +945,27 @@
                 <div class="section-title">Lab Results</div>
             </div>
             <div id="labsList">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- Counseling Page -->
+        <div class="page" id="counselingPage">
+            <div class="section-header">
+                <div class="section-title">Counseling Sessions</div>
+                <a href="#" class="view-all" onclick="openFullSite('counseling'); return false;">Open Desktop</a>
+            </div>
+
+            <div class="app-card" style="margin-bottom: 20px;">
+                <p style="color: var(--text-secondary); line-height: 1.5;">
+                    Review your previous counseling sessions, check follow-up schedules, or request a new session with your care team.
+                </p>
+                <button class="add-button" onclick="showCounselingRequestModal()">
+                    🗓️ Request Counseling Session
+                </button>
+            </div>
+
+            <div id="counselingSessionsList">
                 <!-- Loaded dynamically -->
             </div>
         </div>
@@ -1497,6 +1522,23 @@
             </div>
         </div>
 
+    <!-- Counseling Details Modal -->
+    <div id="counselingDetailsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🗣️ Counseling Session</h3>
+                <button class="modal-close" onclick="closeCounselingDetailsModal()">×</button>
+            </div>
+            <div class="modal-body" id="counselingDetailsBody">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCounselingDetailsModal()">Close</button>
+                <button type="button" class="btn btn-primary" onclick="openFullSite('counseling')">Open Full Site</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Navigation -->
     <div class="bottom-nav">
         <div class="nav-item active" onclick="navigateTo('home')" data-page="home">
@@ -1514,6 +1556,10 @@
         <div class="nav-item" onclick="navigateTo('health')" data-page="health">
             <div class="nav-icon">🎓</div>
             <div class="nav-label">Learn</div>
+        </div>
+        <div class="nav-item" onclick="navigateTo('counseling')" data-page="counseling">
+            <div class="nav-icon">💬</div>
+            <div class="nav-label">Counsel</div>
         </div>
         <div class="nav-item" onclick="navigateTo('chat')" data-page="chat">
             <div class="nav-icon">💬</div>
@@ -1563,7 +1609,8 @@
 
         // Load data
         function loadData() {
-            const patientId = currentUser.patientId;
+            const patientId = parseInt(currentUser.patientId, 10);
+            if (!patientId) return;
             
             // Load appointments
             const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
@@ -1619,6 +1666,9 @@
 
             // Load profile
             loadProfile(patientId);
+
+            // Load counseling sessions
+            loadMobileCounseling(patientId);
         }
 
         function loadNextAppointment(appointment) {
@@ -1788,6 +1838,61 @@
                     </div>
                 </div>
             `).join('');
+
+            container.innerHTML = html;
+        }
+
+        function loadMobileCounseling(patientIdOverride) {
+            const effectivePatientId = parseInt(patientIdOverride ?? (currentUser ? currentUser.patientId : 0), 10);
+            if (!effectivePatientId) return;
+
+            const sessions = JSON.parse(localStorage.getItem('counselingSessions')) || [];
+            const patientSessions = sessions
+                .filter(session => parseInt(session.patientId, 10) === effectivePatientId)
+                .sort((a, b) => new Date(b.sessionDate) - new Date(a.sessionDate));
+
+            const container = document.getElementById('counselingSessionsList');
+            if (!container) return;
+
+            if (patientSessions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <p>No counseling sessions recorded yet.</p>
+                        <button onclick="showCounselingRequestModal()" style="margin-top: 12px; padding: 10px 20px; border: none; background: var(--primary); color: white; border-radius: 10px; cursor: pointer;">
+                            Request Counseling
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = patientSessions.map(session => {
+                const sessionDate = new Date(session.sessionDate).toLocaleDateString();
+                const followUpBadge = session.followUpRequired
+                    ? `<span class="pill pill-warning" style="margin-left: auto;">Follow-up ${session.followUpDate ? `on ${new Date(session.followUpDate).toLocaleDateString()}` : 'required'}</span>`
+                    : '';
+                const topics = (session.topics || []).slice(0, 3).map(topic =>
+                    `<span class="pill pill-primary" style="font-size: 11px;">${topic}</span>`
+                ).join(' ');
+
+                return `
+                    <div class="app-card" style="margin-bottom: 15px; cursor: pointer;" onclick="showCounselingDetails(${session.id})">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <div style="font-size: 28px;">🗣️</div>
+                            <div style="flex: 1;">
+                                <h4 style="margin-bottom: 4px;">${session.sessionType || 'Counseling Session'}</h4>
+                                <div style="font-size: 13px; color: var(--text-secondary);">📅 ${sessionDate}</div>
+                            </div>
+                            ${followUpBadge}
+                        </div>
+                        ${topics ? `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">${topics}</div>` : ''}
+                        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+                            ${session.notes || 'No session notes available.'}
+                        </p>
+                    </div>
+                `;
+            }).join('');
 
             container.innerHTML = html;
         }
@@ -2055,6 +2160,9 @@
                 loadPreviousSurveys();
             } else if (page === 'health') {
                 document.getElementById('healthPage').classList.add('active');
+            } else if (page === 'counseling') {
+                document.getElementById('counselingPage').classList.add('active');
+                loadMobileCounseling();
             } else if (page === 'profile') {
                 document.getElementById('profilePage').classList.add('active');
             } else if (page === 'audit') {
@@ -2117,6 +2225,83 @@
 
         function openFAQ() {
             openFullSite('education');
+        }
+
+        function showCounselingRequestModal() {
+            const goToDesktop = confirm('Counseling requests are processed on the full My Hub Cares site.\n\nPress OK to open the counseling page on the desktop site.');
+            if (goToDesktop) {
+                openFullSite('counseling');
+            }
+        }
+
+        function showCounselingDetails(sessionId) {
+            const sessions = JSON.parse(localStorage.getItem('counselingSessions')) || [];
+            const session = sessions.find(s => parseInt(s.id, 10) === parseInt(sessionId, 10));
+            if (!session) return;
+
+            const patients = JSON.parse(localStorage.getItem('patients')) || [];
+            const patient = patients.find(p => parseInt(p.id, 10) === parseInt(session.patientId, 10));
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            const counselor = users.find(u => parseInt(u.id, 10) === parseInt(session.counselorId, 10));
+
+            const topics = (session.topics || []).map(topic => `<span class="pill pill-primary" style="font-size: 12px;">${topic}</span>`).join(' ');
+
+            const detailsHtml = `
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <div style="font-size: 14px; color: var(--text-secondary);">Session Type</div>
+                        <strong style="font-size: 18px;">${session.sessionType || 'Counseling Session'}</strong>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Date</div>
+                            <strong>${new Date(session.sessionDate).toLocaleDateString()}</strong>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Duration</div>
+                            <strong>${session.duration || 45} minutes</strong>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Patient</div>
+                            <strong>${patient ? `${patient.firstName} ${patient.lastName}` : 'You'}</strong>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Counselor</div>
+                            <strong>${counselor ? counselor.fullName : 'Assigned counselor'}</strong>
+                        </div>
+                    </div>
+                    ${topics ? `
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Topics Covered</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">${topics}</div>
+                        </div>
+                    ` : ''}
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Session Notes</div>
+                        <div style="padding: 12px; background: #f9fafb; border-radius: 10px; font-size: 14px; line-height: 1.6;">
+                            ${session.notes || 'No notes recorded for this session.'}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <span class="pill ${session.followUpRequired ? 'pill-warning' : 'pill-success'}">
+                            ${session.followUpRequired ? `Follow-up ${session.followUpDate ? 'on ' + new Date(session.followUpDate).toLocaleDateString() : 'required'}` : 'Follow-up complete'}
+                        </span>
+                        <span class="pill pill-primary">
+                            Recorded ${session.createdAt ? new Date(session.createdAt).toLocaleDateString() : 'recently'}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('counselingDetailsBody').innerHTML = detailsHtml;
+            document.getElementById('counselingDetailsModal').style.display = 'flex';
+        }
+
+        function closeCounselingDetailsModal() {
+            const modal = document.getElementById('counselingDetailsModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
         }
 
         // Education Tab Switching
