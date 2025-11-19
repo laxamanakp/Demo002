@@ -891,8 +891,25 @@ const App = {
         referrals.push(newReferral);
         localStorage.setItem('referrals', JSON.stringify(referrals));
 
+        // Automatically create a care task for the referral
+        if (typeof CareTasks !== 'undefined') {
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            // Assign to case manager or current user
+            const assignee = users.find(u => u.role === 'case_manager') || currentUser;
+            
+            CareTasks.createTask({
+                referral_id: newReferral.id,
+                patient_id: newReferral.patientId,
+                assignee_id: assignee.id || assignee.userId,
+                task_type: 'referral',
+                task_description: `Coordinate referral #${newReferral.id}: ${newReferral.reason.substring(0, 50)}${newReferral.reason.length > 50 ? '...' : ''}`,
+                due_date: newReferral.referralDate || null,
+                created_by: currentUser.userId
+            });
+        }
+
         App.closeModal();
-        App.showSuccess('Referral created successfully');
+        App.showSuccess('Referral created successfully. A care task has been automatically created.');
         App.loadPage('referrals');
     },
 

@@ -299,8 +299,23 @@ const Counseling = {
         sessions.push(newSession);
         localStorage.setItem('counselingSessions', JSON.stringify(sessions));
 
+        // Automatically create a care task if follow-up is required
+        if (newSession.followUpRequired && typeof CareTasks !== 'undefined') {
+            CareTasks.createTask({
+                patient_id: newSession.patientId,
+                assignee_id: newSession.counselorId,
+                task_type: 'counseling',
+                task_description: `Follow-up counseling session for ${newSession.sessionType}`,
+                due_date: newSession.followUpDate || null,
+                created_by: currentUser.userId
+            });
+        }
+
         App.closeModal();
-        App.showSuccess('Counseling session recorded successfully');
+        const message = newSession.followUpRequired 
+            ? 'Counseling session recorded successfully. A follow-up care task has been created.'
+            : 'Counseling session recorded successfully';
+        App.showSuccess(message);
         App.loadPage('counseling');
     },
 

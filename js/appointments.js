@@ -253,16 +253,6 @@ const Appointments = {
         const content = `
             <form id="addAppointmentForm">
                 ${patientSelect}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="required">Date</label>
-                        <input type="date" id="appointmentDate" required min="${new Date().toISOString().split('T')[0]}">
-                    </div>
-                    <div class="form-group">
-                        <label class="required">Time</label>
-                        <input type="time" id="appointmentTime" required>
-                    </div>
-                </div>
                 <div class="form-group">
                     <label class="required">MyHubCares Branch</label>
                     <select id="facilityId" required>
@@ -276,6 +266,21 @@ const Appointments = {
                         <option value="">Select Provider</option>
                         ${providers.map(p => `<option value="${p.id}">${p.fullName} (${p.role})</option>`).join('')}
                     </select>
+                </div>
+                <div class="form-group">
+                    <label class="required">Date</label>
+                    <input type="date" id="appointmentDate" required min="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label class="required">Time</label>
+                    <div id="timeSlotContainer">
+                        <input type="time" id="appointmentTime" required disabled>
+                        <div id="availableSlotsDisplay" class="available-slots mt-2">
+                            <div class="slot-message">
+                                <small class="text-muted">Please select provider, facility, and date to see available slots</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="required">Appointment Type</label>
@@ -301,6 +306,9 @@ const Appointments = {
         `;
 
         App.showModal('Book Appointment', content, footer);
+        
+        // Setup event listeners for dynamic slot loading
+        this.setupSlotEventListeners();
     },
 
     // Add appointment
@@ -312,20 +320,41 @@ const Appointments = {
         }
 
         const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+        const patientId = parseInt(document.getElementById('patientId').value);
+        const facilityId = parseInt(document.getElementById('facilityId').value);
+        const providerId = parseInt(document.getElementById('providerId').value);
+        const appointmentDate = document.getElementById('appointmentDate').value;
+        const appointmentTime = document.getElementById('appointmentTime').value;
+        const slotLookup = this.findAvailableSlot(providerId, facilityId, appointmentDate, appointmentTime);
+
+        if (!slotLookup.slot) {
+            App.showError(slotLookup.message || 'Selected time is no longer available. Please choose another slot.');
+            return;
+        }
+
+        const scheduledStart = this.getScheduledDateTime(appointmentDate, appointmentTime);
+        const scheduledEnd = this.getScheduledDateTime(appointmentDate, appointmentTime, this.getDefaultDurationMinutes());
+
         const newAppointment = {
             id: appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 1,
-            patientId: parseInt(document.getElementById('patientId').value),
-            facilityId: parseInt(document.getElementById('facilityId').value),
-            providerId: parseInt(document.getElementById('providerId').value),
-            appointmentDate: document.getElementById('appointmentDate').value,
-            appointmentTime: document.getElementById('appointmentTime').value,
+            patientId,
+            facilityId,
+            providerId,
+            appointmentDate,
+            appointmentTime,
             type: document.getElementById('appointmentType').value,
             status: 'scheduled',
-            notes: document.getElementById('notes').value
+            notes: document.getElementById('notes').value,
+            slotId: slotLookup.slot.slot_id,
+            scheduledStart,
+            scheduledEnd,
+            durationMinutes: this.getDefaultDurationMinutes()
         };
 
         appointments.push(newAppointment);
         localStorage.setItem('appointments', JSON.stringify(appointments));
+
+        this.markSlotAsBooked(slotLookup.slot.slot_id, newAppointment.id);
 
         App.closeModal();
         App.showSuccess('Appointment booked successfully');
@@ -369,16 +398,6 @@ const Appointments = {
             <form id="editAppointmentForm">
                 <input type="hidden" id="appointmentId" value="${appointment.id}">
                 ${patientSelect}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="required">Date</label>
-                        <input type="date" id="appointmentDate" value="${appointment.appointmentDate}" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="required">Time</label>
-                        <input type="time" id="appointmentTime" value="${appointment.appointmentTime}" required>
-                    </div>
-                </div>
                 <div class="form-group">
                     <label class="required">Facility</label>
                     <select id="facilityId" required>
@@ -390,6 +409,21 @@ const Appointments = {
                     <select id="providerId" required>
                         ${providers.map(p => `<option value="${p.id}" ${p.id === appointment.providerId ? 'selected' : ''}>${p.fullName} (${p.role})</option>`).join('')}
                     </select>
+                </div>
+                <div class="form-group">
+                    <label class="required">Date</label>
+                    <input type="date" id="appointmentDate" value="${appointment.appointmentDate}" required>
+                </div>
+                <div class="form-group">
+                    <label class="required">Time</label>
+                    <div id="timeSlotContainer">
+                        <input type="time" id="appointmentTime" value="${appointment.appointmentTime}" required>
+                        <div id="availableSlotsDisplay" class="available-slots mt-2">
+                            <div class="slot-message">
+                                <small class="text-muted">Select date to see available slots</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="required">Appointment Type</label>
@@ -414,6 +448,19 @@ const Appointments = {
         `;
 
         App.showModal('Edit Appointment', content, footer);
+        
+        // Setup event listeners and load slots for current selection
+        this.setupSlotEventListeners();
+        // Load slots after a brief delay to ensure DOM is ready
+        setTimeout(() => {
+            this.loadAvailableSlots();
+            // Pre-select current appointment time if it exists in available slots
+            if (appointment.appointmentTime) {
+                setTimeout(() => {
+                    this.selectTimeSlot(appointment.appointmentTime);
+                }, 200);
+            }
+        }, 100);
     },
 
     // Update appointment
@@ -433,18 +480,57 @@ const Appointments = {
             return;
         }
 
+        const patientId = parseInt(document.getElementById('patientId').value);
+        const facilityId = parseInt(document.getElementById('facilityId').value);
+        const providerId = parseInt(document.getElementById('providerId').value);
+        const appointmentDate = document.getElementById('appointmentDate').value;
+        const appointmentTime = document.getElementById('appointmentTime').value;
+        const appointmentType = document.getElementById('appointmentType').value;
+        const notes = document.getElementById('notes').value;
+        const currentAppointment = appointments[index];
+
+        const requiresSlotUpdate = currentAppointment.providerId !== providerId ||
+            currentAppointment.facilityId !== facilityId ||
+            currentAppointment.appointmentDate !== appointmentDate ||
+            currentAppointment.appointmentTime !== appointmentTime;
+
+        let slotLookup = null;
+
+        if (requiresSlotUpdate) {
+            slotLookup = this.findAvailableSlot(providerId, facilityId, appointmentDate, appointmentTime);
+
+            if (!slotLookup.slot) {
+                App.showError(slotLookup.message || 'Selected time is no longer available. Please choose another slot.');
+                return;
+            }
+        }
+
+        const scheduledStart = this.getScheduledDateTime(appointmentDate, appointmentTime);
+        const scheduledEnd = this.getScheduledDateTime(appointmentDate, appointmentTime, this.getDefaultDurationMinutes());
+
         appointments[index] = {
             ...appointments[index],
-            patientId: parseInt(document.getElementById('patientId').value),
-            facilityId: parseInt(document.getElementById('facilityId').value),
-            providerId: parseInt(document.getElementById('providerId').value),
-            appointmentDate: document.getElementById('appointmentDate').value,
-            appointmentTime: document.getElementById('appointmentTime').value,
-            type: document.getElementById('appointmentType').value,
-            notes: document.getElementById('notes').value
+            patientId,
+            facilityId,
+            providerId,
+            appointmentDate,
+            appointmentTime,
+            type: appointmentType,
+            notes,
+            slotId: requiresSlotUpdate ? slotLookup.slot.slot_id : appointments[index].slotId,
+            scheduledStart,
+            scheduledEnd,
+            durationMinutes: this.getDefaultDurationMinutes()
         };
 
         localStorage.setItem('appointments', JSON.stringify(appointments));
+
+        if (requiresSlotUpdate) {
+            this.releaseSlot(currentAppointment);
+            this.markSlotAsBooked(slotLookup.slot.slot_id, appointments[index].id);
+        }
+
+        this.scheduleReminder(appointments[index]);
 
         App.closeModal();
         App.showSuccess('Appointment updated successfully');
@@ -468,12 +554,42 @@ const Appointments = {
         appointments[index].status = 'cancelled';
         localStorage.setItem('appointments', JSON.stringify(appointments));
 
+        this.releaseSlot(appointments[index]);
+        this.cancelReminderForAppointment(appointmentId);
+
         App.showSuccess('Appointment cancelled successfully');
         App.loadPage('appointments');
     },
 
     // Schedule reminder notification (simulated)
     scheduleReminder(appointment) {
+        const reminders = JSON.parse(localStorage.getItem('appointment_reminders')) || [];
+        const appointmentDateTime = appointment.scheduledStart
+            ? new Date(appointment.scheduledStart)
+            : new Date(`${appointment.appointmentDate}T${appointment.appointmentTime}`);
+        const reminderDate = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
+        const reminderScheduledAt = isNaN(reminderDate.getTime()) ? new Date() : reminderDate;
+        const reminderId = `rem_${Date.now()}`;
+
+        const existingReminderIndex = reminders.findIndex(r => r.appointment_id === appointment.id);
+        const reminderPayload = {
+            reminder_id: existingReminderIndex !== -1 ? reminders[existingReminderIndex].reminder_id : reminderId,
+            appointment_id: appointment.id,
+            reminder_type: 'in_app',
+            reminder_scheduled_at: reminderScheduledAt.toISOString(),
+            reminder_sent_at: null,
+            status: 'pending',
+            created_at: existingReminderIndex !== -1 ? reminders[existingReminderIndex].created_at : new Date().toISOString()
+        };
+
+        if (existingReminderIndex !== -1) {
+            reminders[existingReminderIndex] = reminderPayload;
+        } else {
+            reminders.push(reminderPayload);
+        }
+
+        localStorage.setItem('appointment_reminders', JSON.stringify(reminders));
+
         // In a real app, this would schedule actual notifications
         // For demo purposes, we'll just show a message
         console.log('Reminder scheduled for appointment:', appointment);
@@ -484,6 +600,346 @@ const Appointments = {
             new Notification('Appointment Reminder', {
                 body: `Your appointment is scheduled for ${appointment.appointmentDate} at ${appointment.appointmentTime}`,
                 icon: '/favicon.ico'
+            });
+        }
+    },
+
+    cancelReminderForAppointment(appointmentId) {
+        const reminders = JSON.parse(localStorage.getItem('appointment_reminders')) || [];
+        const reminderIndex = reminders.findIndex(r => r.appointment_id === appointmentId);
+
+        if (reminderIndex !== -1) {
+            reminders[reminderIndex].status = 'cancelled';
+            reminders[reminderIndex].reminder_sent_at = null;
+            localStorage.setItem('appointment_reminders', JSON.stringify(reminders));
+        }
+    },
+
+    findAvailableSlot(providerId, facilityId, appointmentDate, appointmentTime, providedSlots = null) {
+        const slots = providedSlots || JSON.parse(localStorage.getItem('availability_slots')) || [];
+        const matchingSlots = slots.filter(slot =>
+            slot.provider_id === providerId &&
+            slot.facility_id === facilityId &&
+            slot.slot_date === appointmentDate
+        );
+
+        if (matchingSlots.length === 0) {
+            return {
+                slot: null,
+                slots,
+                message: 'No availability slots configured for the selected provider, facility, and date.'
+            };
+        }
+
+        const requestedTime = this.timeStringToMinutes(appointmentTime);
+        const availableSlot = matchingSlots.find(slot =>
+            slot.slot_status === 'available' &&
+            requestedTime >= this.timeStringToMinutes(slot.start_time) &&
+            requestedTime < this.timeStringToMinutes(slot.end_time)
+        );
+
+        if (!availableSlot) {
+            return {
+                slot: null,
+                slots,
+                message: 'Selected time is already booked or outside the provider’s available hours.'
+            };
+        }
+
+        return { slot: availableSlot, slots };
+    },
+
+    timeStringToMinutes(timeString) {
+        if (!timeString) return 0;
+        const [hours, minutes] = timeString.split(':').map(num => parseInt(num, 10));
+        return (hours * 60) + minutes;
+    },
+
+    markSlotAsBooked(slotId, appointmentId) {
+        if (!slotId) return;
+        const slots = JSON.parse(localStorage.getItem('availability_slots')) || [];
+        const slotIndex = slots.findIndex(slot => slot.slot_id === slotId);
+        if (slotIndex === -1) return;
+
+        slots[slotIndex] = {
+            ...slots[slotIndex],
+            slot_status: 'booked',
+            appointment_id: appointmentId
+        };
+
+        localStorage.setItem('availability_slots', JSON.stringify(slots));
+    },
+
+    releaseSlot(appointment) {
+        if (!appointment || !appointment.slotId) return;
+        const slots = JSON.parse(localStorage.getItem('availability_slots')) || [];
+        const slotIndex = slots.findIndex(slot => slot.slot_id === appointment.slotId);
+        if (slotIndex === -1) return;
+
+        if (slots[slotIndex].appointment_id && slots[slotIndex].appointment_id !== appointment.id) {
+            return;
+        }
+
+        slots[slotIndex] = {
+            ...slots[slotIndex],
+            slot_status: 'available',
+            appointment_id: null
+        };
+
+        localStorage.setItem('availability_slots', JSON.stringify(slots));
+    },
+
+    getScheduledDateTime(date, time, offsetMinutes = 0) {
+        const timestamp = new Date(`${date}T${time}`);
+        if (isNaN(timestamp.getTime())) {
+            return null;
+        }
+
+        if (offsetMinutes) {
+            timestamp.setMinutes(timestamp.getMinutes() + offsetMinutes);
+        }
+
+        return timestamp.toISOString();
+    },
+
+    getDefaultDurationMinutes() {
+        return 30;
+    },
+
+    // ========== AVAILABLE SLOTS FEATURE ==========
+    
+    // Get available slots for a provider, facility, and date
+    getAvailableSlots(providerId, facilityId, appointmentDate) {
+        if (!providerId || !facilityId || !appointmentDate) {
+            return {
+                slots: [],
+                message: 'Please select provider, facility, and date first.'
+            };
+        }
+
+        const slots = JSON.parse(localStorage.getItem('availability_slots')) || [];
+        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+        
+        // Filter slots by provider, facility, and date
+        const matchingSlots = slots.filter(slot =>
+            slot.provider_id === providerId &&
+            slot.facility_id === facilityId &&
+            slot.slot_date === appointmentDate
+        );
+
+        if (matchingSlots.length === 0) {
+            return {
+                slots: [],
+                message: 'No availability slots configured for the selected provider, facility, and date.'
+            };
+        }
+
+        // Get booked times from appointments
+        const bookedTimes = appointments
+            .filter(apt => 
+                apt.providerId === providerId &&
+                apt.facilityId === facilityId &&
+                apt.appointmentDate === appointmentDate &&
+                apt.status === 'scheduled'
+            )
+            .map(apt => apt.appointmentTime);
+
+        // Filter available slots and generate time options
+        const availableSlots = matchingSlots.filter(slot => 
+            slot.slot_status === 'available'
+        );
+
+        if (availableSlots.length === 0) {
+            return {
+                slots: [],
+                message: 'All slots are booked for this date. Please try another date.'
+            };
+        }
+
+        // Generate time slots from available ranges
+        const timeSlots = this.generateTimeSlots(availableSlots, bookedTimes);
+
+        return {
+            slots: timeSlots,
+            message: timeSlots.length > 0 ? `${timeSlots.length} available slot(s)` : 'No available slots'
+        };
+    },
+
+    // Generate discrete time slots from slot ranges
+    generateTimeSlots(slots, bookedTimes = [], intervalMinutes = 30) {
+        const timeSlots = [];
+        const bookedMinutes = bookedTimes.map(time => this.timeStringToMinutes(time));
+
+        slots.forEach(slot => {
+            const startMinutes = this.timeStringToMinutes(slot.start_time);
+            const endMinutes = this.timeStringToMinutes(slot.end_time);
+            
+            // Generate time slots in intervals
+            for (let minutes = startMinutes; minutes < endMinutes; minutes += intervalMinutes) {
+                const timeString = this.minutesToTimeString(minutes);
+                
+                // Skip if this time is already booked
+                if (!bookedMinutes.includes(minutes)) {
+                    // Check if time slot already exists
+                    if (!timeSlots.find(ts => ts.time === timeString)) {
+                        timeSlots.push({
+                            time: timeString,
+                            display: this.formatTimeDisplay(timeString),
+                            slotId: slot.slot_id,
+                            minutes: minutes
+                        });
+                    }
+                }
+            }
+        });
+
+        // Sort by time
+        return timeSlots.sort((a, b) => a.minutes - b.minutes);
+    },
+
+    // Convert minutes to time string (HH:MM)
+    minutesToTimeString(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    },
+
+    // Format time for display (e.g., "09:00" -> "9:00 AM")
+    formatTimeDisplay(timeString) {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+    },
+
+    // Load and display available slots
+    loadAvailableSlots() {
+        const providerId = document.getElementById('providerId')?.value;
+        const facilityId = document.getElementById('facilityId')?.value;
+        const appointmentDate = document.getElementById('appointmentDate')?.value;
+        const timeSlotContainer = document.getElementById('timeSlotContainer');
+        const availableSlotsDisplay = document.getElementById('availableSlotsDisplay');
+        const appointmentTimeInput = document.getElementById('appointmentTime');
+
+        if (!timeSlotContainer || !availableSlotsDisplay) return;
+
+        // Clear previous display
+        availableSlotsDisplay.innerHTML = '';
+        
+        if (!providerId || !facilityId || !appointmentDate) {
+            availableSlotsDisplay.innerHTML = `
+                <div class="slot-message">
+                    <small class="text-muted">Please select provider, facility, and date to see available slots</small>
+                </div>
+            `;
+            if (appointmentTimeInput) {
+                appointmentTimeInput.disabled = true;
+                appointmentTimeInput.value = '';
+            }
+            return;
+        }
+
+        // Show loading state
+        availableSlotsDisplay.innerHTML = `
+            <div class="slot-loading">
+                <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                <small class="text-muted">Loading available slots...</small>
+            </div>
+        `;
+
+        // Simulate slight delay for better UX (remove in production if not needed)
+        setTimeout(() => {
+            const result = this.getAvailableSlots(
+                parseInt(providerId),
+                parseInt(facilityId),
+                appointmentDate
+            );
+
+            if (result.slots.length === 0) {
+                availableSlotsDisplay.innerHTML = `
+                    <div class="slot-message">
+                        <small class="text-warning">${result.message}</small>
+                    </div>
+                `;
+                if (appointmentTimeInput) {
+                    appointmentTimeInput.disabled = true;
+                    appointmentTimeInput.value = '';
+                }
+            } else {
+                // Render available slots
+                availableSlotsDisplay.innerHTML = this.renderAvailableSlots(result.slots);
+                if (appointmentTimeInput) {
+                    appointmentTimeInput.disabled = false;
+                }
+            }
+        }, 100);
+    },
+
+    // Render available slots as buttons
+    renderAvailableSlots(slots) {
+        if (!slots || slots.length === 0) {
+            return '<div class="slot-message"><small class="text-muted">No slots available</small></div>';
+        }
+
+        const slotsHtml = slots.map(slot => `
+            <button type="button" 
+                    class="slot-btn available" 
+                    data-time="${slot.time}"
+                    onclick="Appointments.selectTimeSlot('${slot.time}')">
+                ${slot.display}
+            </button>
+        `).join('');
+
+        return `
+            <div class="slot-info">
+                <small class="text-muted">${slots.length} available slot(s) - Click to select:</small>
+            </div>
+            <div class="available-slots-grid">
+                ${slotsHtml}
+            </div>
+        `;
+    },
+
+    // Select a time slot
+    selectTimeSlot(timeString) {
+        const appointmentTimeInput = document.getElementById('appointmentTime');
+        if (appointmentTimeInput) {
+            appointmentTimeInput.value = timeString;
+            
+            // Update visual selection
+            document.querySelectorAll('.slot-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.getAttribute('data-time') === timeString) {
+                    btn.classList.add('selected');
+                }
+            });
+
+            // Trigger change event
+            appointmentTimeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    },
+
+    // Setup event listeners for slot loading
+    setupSlotEventListeners() {
+        const providerSelect = document.getElementById('providerId');
+        const facilitySelect = document.getElementById('facilityId');
+        const dateInput = document.getElementById('appointmentDate');
+
+        if (providerSelect) {
+            providerSelect.addEventListener('change', () => {
+                this.loadAvailableSlots();
+            });
+        }
+
+        if (facilitySelect) {
+            facilitySelect.addEventListener('change', () => {
+                this.loadAvailableSlots();
+            });
+        }
+
+        if (dateInput) {
+            dateInput.addEventListener('change', () => {
+                this.loadAvailableSlots();
             });
         }
     }

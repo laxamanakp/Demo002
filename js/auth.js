@@ -167,6 +167,7 @@ const Auth = {
                 { id: 'hts', label: 'HTS Sessions', icon: 'test-tube' },
                 { id: 'counseling', label: 'Counseling', icon: 'message-circle' },
                 { id: 'referrals', label: 'Referrals', icon: 'share' },
+                { id: 'care-tasks', label: 'Care Tasks', icon: 'check-square' },
                 { id: 'surveys', label: 'Satisfaction Surveys', icon: 'star' },
                 { id: 'users', label: 'User Management', icon: 'user-plus' },
                 { id: 'facilities', label: 'My Hub Cares Branches', icon: 'building' },
@@ -184,6 +185,7 @@ const Auth = {
                 { id: 'vaccinations', label: 'Vaccination Program', icon: 'syringe' },
                 { id: 'lab-tests', label: 'Lab Results', icon: 'activity' },
                 { id: 'counseling', label: 'Counseling', icon: 'message-circle' },
+                { id: 'care-tasks', label: 'Care Tasks', icon: 'check-square' },
                 { id: 'inventory', label: 'Inventory', icon: 'package' },
                 { id: 'audit', label: 'My Activity Log', icon: 'shield' },
                 { id: 'education', label: 'Education', icon: 'book' }
@@ -197,6 +199,7 @@ const Auth = {
                 { id: 'inventory', label: 'Inventory', icon: 'package' },
                 { id: 'prescriptions', label: 'Prescriptions', icon: 'file-text' },
                 { id: 'hts', label: 'HTS Sessions', icon: 'test-tube' },
+                { id: 'care-tasks', label: 'Care Tasks', icon: 'check-square' },
                 { id: 'audit', label: 'My Activity Log', icon: 'shield' },
                 { id: 'education', label: 'Education', icon: 'book' }
             ],
@@ -206,6 +209,7 @@ const Auth = {
                 { id: 'appointments', label: 'Appointments', icon: 'calendar' },
                 { id: 'counseling', label: 'Counseling', icon: 'message-circle' },
                 { id: 'referrals', label: 'Referrals', icon: 'share' },
+                { id: 'care-tasks', label: 'Care Tasks', icon: 'check-square' },
                 { id: 'hts', label: 'HTS Sessions', icon: 'test-tube' },
                 { id: 'audit', label: 'My Activity Log', icon: 'shield' },
                 { id: 'education', label: 'Education', icon: 'book' }
@@ -257,7 +261,8 @@ const Auth = {
             shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>',
             'test-tube': '<path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5s-2.5-1.1-2.5-2.5V2"></path><path d="M8.5 2h7"></path><path d="M9 16h6"></path>',
             'message-circle': '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>',
-            star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
+            star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>',
+            'check-square': '<polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>'
         };
         
         return icons[iconName] || '';

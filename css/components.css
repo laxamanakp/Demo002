@@ -647,3 +647,107 @@ tr:hover {
     z-index: 3000;
 }
 
+/* ============================================================
+   Available Slots Display
+   ============================================================ */
+
+.available-slots {
+    margin-top: 12px;
+}
+
+.slot-info {
+    margin-bottom: 8px;
+}
+
+.slot-message {
+    padding: 8px 0;
+}
+
+.slot-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.available-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.slot-btn {
+    padding: 10px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: white;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.slot-btn:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.slot-btn.available {
+    border-color: var(--success-color);
+    color: var(--success-color);
+    background: #f0fdf4;
+}
+
+.slot-btn.available:hover:not(:disabled) {
+    border-color: var(--success-color);
+    background: #dcfce7;
+    color: #166534;
+}
+
+.slot-btn.selected {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.slot-btn.selected:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
+.slot-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.slot-btn.booked {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .available-slots-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 6px;
+    }
+    
+    .slot-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+

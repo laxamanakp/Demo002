@@ -175,9 +175,10 @@ const CareTasks = {
                     <label>Related Referral (Optional)</label>
                     <select id="referralId">
                         <option value="">None</option>
-                        ${referrals.filter(r => r.status === 'pending' || r.status === 'accepted').map(r => 
-                            `<option value="${r.id}">Referral #${r.id} - ${r.referral_reason.substring(0, 50)}...</option>`
-                        ).join('')}
+                        ${referrals.filter(r => r.status === 'pending' || r.status === 'accepted').map(r => {
+                            const reason = r.reason || r.referral_reason || 'No reason provided';
+                            return `<option value="${r.id}">Referral #${r.id} - ${reason.substring(0, 50)}${reason.length > 50 ? '...' : ''}</option>`;
+                        }).join('')}
                     </select>
                 </div>
             </form>
@@ -191,6 +192,30 @@ const CareTasks = {
         App.showModal('Create Care Task', content, footer);
     },
 
+    // Helper function to create a task programmatically
+    createTask(taskData) {
+        const tasks = JSON.parse(localStorage.getItem('care_tasks')) || [];
+        const currentUser = Auth.getCurrentUser();
+        
+        const newTask = {
+            task_id: 'task_' + Date.now(),
+            referral_id: taskData.referral_id || null,
+            patient_id: taskData.patient_id,
+            assignee_id: taskData.assignee_id || currentUser.userId,
+            task_type: taskData.task_type || 'other',
+            task_description: taskData.task_description,
+            due_date: taskData.due_date || null,
+            status: 'pending',
+            completed_at: null,
+            created_at: new Date().toISOString(),
+            created_by: taskData.created_by || currentUser.userId
+        };
+
+        tasks.push(newTask);
+        localStorage.setItem('care_tasks', JSON.stringify(tasks));
+        return newTask;
+    },
+
     addTask() {
         const form = document.getElementById('addTaskForm');
         if (!form.checkValidity()) {
@@ -198,27 +223,19 @@ const CareTasks = {
             return;
         }
 
-        const tasks = JSON.parse(localStorage.getItem('care_tasks')) || [];
         const currentUser = Auth.getCurrentUser();
         const referralId = document.getElementById('referralId').value;
         const dueDate = document.getElementById('dueDate').value;
 
-        const newTask = {
-            task_id: 'task_' + Date.now(),
+        this.createTask({
             referral_id: referralId || null,
             patient_id: parseInt(document.getElementById('patientId').value),
             assignee_id: parseInt(document.getElementById('assigneeId').value),
             task_type: document.getElementById('taskType').value,
             task_description: document.getElementById('taskDescription').value.trim(),
             due_date: dueDate || null,
-            status: 'pending',
-            completed_at: null,
-            created_at: new Date().toISOString(),
             created_by: currentUser.userId
-        };
-
-        tasks.push(newTask);
-        localStorage.setItem('care_tasks', JSON.stringify(tasks));
+        });
         
         App.closeModal();
         App.showSuccess('Care task created successfully');
@@ -275,7 +292,7 @@ const CareTasks = {
             ${referral ? `
                 <div class="form-group">
                     <label>Related Referral</label>
-                    <input type="text" value="Referral #${referral.id}: ${referral.referral_reason.substring(0, 50)}..." readonly>
+                    <input type="text" value="Referral #${referral.id}: ${(referral.reason || referral.referral_reason || 'No reason provided').substring(0, 50)}${(referral.reason || referral.referral_reason || '').length > 50 ? '...' : ''}" readonly>
                 </div>
             ` : ''}
             <div class="form-row">
