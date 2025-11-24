@@ -1684,6 +1684,12 @@ This document provides a comprehensive breakdown of the database structure per m
 1. **ARPA Risk Calculation (P2.4)**:
    - Retrieves from: D2 (patients), D3 (visits), D4 (medications), D5 (lab), D6 (appointments)
    - Calculates risk score → Updates D2 (patients.arpa_risk_score)
+   - **Risk context**: Scoring never hinges on one dimension; perfect attendance, adherence, or lifestyle indicators cannot offset persistently low clinical values.
+   - **Laboratory weight**: Year-over-year low lab values flag treatment failure and show when therapy is not working despite patient compliance.
+   - **Possible causes**: Results may stay low because the regimen is ineffective (hindi tumatalab) or another underlying issue suppresses improvement, so compliance alone cannot downgrade risk.
+   - **Risk implication**: Patients remain high risk until lab trends improve, because the treatment goal—better clinical measures—has not been achieved.
+   - **Provider action**: When labs stay low, clinicians should reassess the plan and consider adjusting or changing medications to restore the patient’s clinical status.
+   - **One-line takeaway**: A patient can still be high risk even if compliant, because lab results are the clearest indicator of whether therapy is truly effective.
 
 2. **Prescription Flow (P4.1)**:
    - Retrieves from: D2 (patients), D4 (inventory)

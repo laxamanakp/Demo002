@@ -253,6 +253,16 @@ const Appointments = {
         const content = `
             <form id="addAppointmentForm">
                 ${patientSelect}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">Date</label>
+                        <input type="date" id="appointmentDate" required min="${new Date().toISOString().split('T')[0]}">
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Time</label>
+                        <input type="time" id="appointmentTime" required>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label class="required">MyHubCares Branch</label>
                     <select id="facilityId" required>
@@ -266,21 +276,6 @@ const Appointments = {
                         <option value="">Select Provider</option>
                         ${providers.map(p => `<option value="${p.id}">${p.fullName} (${p.role})</option>`).join('')}
                     </select>
-                </div>
-                <div class="form-group">
-                    <label class="required">Date</label>
-                    <input type="date" id="appointmentDate" required min="${new Date().toISOString().split('T')[0]}">
-                </div>
-                <div class="form-group">
-                    <label class="required">Time</label>
-                    <div id="timeSlotContainer">
-                        <input type="time" id="appointmentTime" required disabled>
-                        <div id="availableSlotsDisplay" class="available-slots mt-2">
-                            <div class="slot-message">
-                                <small class="text-muted">Please select provider, facility, and date to see available slots</small>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 <div class="form-group">
                     <label class="required">Appointment Type</label>
@@ -306,9 +301,6 @@ const Appointments = {
         `;
 
         App.showModal('Book Appointment', content, footer);
-        
-        // Setup event listeners for dynamic slot loading
-        this.setupSlotEventListeners();
     },
 
     // Add appointment
@@ -398,6 +390,16 @@ const Appointments = {
             <form id="editAppointmentForm">
                 <input type="hidden" id="appointmentId" value="${appointment.id}">
                 ${patientSelect}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">Date</label>
+                        <input type="date" id="appointmentDate" value="${appointment.appointmentDate}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Time</label>
+                        <input type="time" id="appointmentTime" value="${appointment.appointmentTime}" required>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label class="required">Facility</label>
                     <select id="facilityId" required>
@@ -409,21 +411,6 @@ const Appointments = {
                     <select id="providerId" required>
                         ${providers.map(p => `<option value="${p.id}" ${p.id === appointment.providerId ? 'selected' : ''}>${p.fullName} (${p.role})</option>`).join('')}
                     </select>
-                </div>
-                <div class="form-group">
-                    <label class="required">Date</label>
-                    <input type="date" id="appointmentDate" value="${appointment.appointmentDate}" required>
-                </div>
-                <div class="form-group">
-                    <label class="required">Time</label>
-                    <div id="timeSlotContainer">
-                        <input type="time" id="appointmentTime" value="${appointment.appointmentTime}" required>
-                        <div id="availableSlotsDisplay" class="available-slots mt-2">
-                            <div class="slot-message">
-                                <small class="text-muted">Select date to see available slots</small>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 <div class="form-group">
                     <label class="required">Appointment Type</label>
@@ -448,19 +435,6 @@ const Appointments = {
         `;
 
         App.showModal('Edit Appointment', content, footer);
-        
-        // Setup event listeners and load slots for current selection
-        this.setupSlotEventListeners();
-        // Load slots after a brief delay to ensure DOM is ready
-        setTimeout(() => {
-            this.loadAvailableSlots();
-            // Pre-select current appointment time if it exists in available slots
-            if (appointment.appointmentTime) {
-                setTimeout(() => {
-                    this.selectTimeSlot(appointment.appointmentTime);
-                }, 200);
-            }
-        }, 100);
     },
 
     // Update appointment
@@ -704,244 +678,6 @@ const Appointments = {
 
     getDefaultDurationMinutes() {
         return 30;
-    },
-
-    // ========== AVAILABLE SLOTS FEATURE ==========
-    
-    // Get available slots for a provider, facility, and date
-    getAvailableSlots(providerId, facilityId, appointmentDate) {
-        if (!providerId || !facilityId || !appointmentDate) {
-            return {
-                slots: [],
-                message: 'Please select provider, facility, and date first.'
-            };
-        }
-
-        const slots = JSON.parse(localStorage.getItem('availability_slots')) || [];
-        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-        
-        // Filter slots by provider, facility, and date
-        const matchingSlots = slots.filter(slot =>
-            slot.provider_id === providerId &&
-            slot.facility_id === facilityId &&
-            slot.slot_date === appointmentDate
-        );
-
-        if (matchingSlots.length === 0) {
-            return {
-                slots: [],
-                message: 'No availability slots configured for the selected provider, facility, and date.'
-            };
-        }
-
-        // Get booked times from appointments
-        const bookedTimes = appointments
-            .filter(apt => 
-                apt.providerId === providerId &&
-                apt.facilityId === facilityId &&
-                apt.appointmentDate === appointmentDate &&
-                apt.status === 'scheduled'
-            )
-            .map(apt => apt.appointmentTime);
-
-        // Filter available slots and generate time options
-        const availableSlots = matchingSlots.filter(slot => 
-            slot.slot_status === 'available'
-        );
-
-        if (availableSlots.length === 0) {
-            return {
-                slots: [],
-                message: 'All slots are booked for this date. Please try another date.'
-            };
-        }
-
-        // Generate time slots from available ranges
-        const timeSlots = this.generateTimeSlots(availableSlots, bookedTimes);
-
-        return {
-            slots: timeSlots,
-            message: timeSlots.length > 0 ? `${timeSlots.length} available slot(s)` : 'No available slots'
-        };
-    },
-
-    // Generate discrete time slots from slot ranges
-    generateTimeSlots(slots, bookedTimes = [], intervalMinutes = 30) {
-        const timeSlots = [];
-        const bookedMinutes = bookedTimes.map(time => this.timeStringToMinutes(time));
-
-        slots.forEach(slot => {
-            const startMinutes = this.timeStringToMinutes(slot.start_time);
-            const endMinutes = this.timeStringToMinutes(slot.end_time);
-            
-            // Generate time slots in intervals
-            for (let minutes = startMinutes; minutes < endMinutes; minutes += intervalMinutes) {
-                const timeString = this.minutesToTimeString(minutes);
-                
-                // Skip if this time is already booked
-                if (!bookedMinutes.includes(minutes)) {
-                    // Check if time slot already exists
-                    if (!timeSlots.find(ts => ts.time === timeString)) {
-                        timeSlots.push({
-                            time: timeString,
-                            display: this.formatTimeDisplay(timeString),
-                            slotId: slot.slot_id,
-                            minutes: minutes
-                        });
-                    }
-                }
-            }
-        });
-
-        // Sort by time
-        return timeSlots.sort((a, b) => a.minutes - b.minutes);
-    },
-
-    // Convert minutes to time string (HH:MM)
-    minutesToTimeString(minutes) {
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-    },
-
-    // Format time for display (e.g., "09:00" -> "9:00 AM")
-    formatTimeDisplay(timeString) {
-        const [hours, minutes] = timeString.split(':').map(Number);
-        const period = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-        return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
-    },
-
-    // Load and display available slots
-    loadAvailableSlots() {
-        const providerId = document.getElementById('providerId')?.value;
-        const facilityId = document.getElementById('facilityId')?.value;
-        const appointmentDate = document.getElementById('appointmentDate')?.value;
-        const timeSlotContainer = document.getElementById('timeSlotContainer');
-        const availableSlotsDisplay = document.getElementById('availableSlotsDisplay');
-        const appointmentTimeInput = document.getElementById('appointmentTime');
-
-        if (!timeSlotContainer || !availableSlotsDisplay) return;
-
-        // Clear previous display
-        availableSlotsDisplay.innerHTML = '';
-        
-        if (!providerId || !facilityId || !appointmentDate) {
-            availableSlotsDisplay.innerHTML = `
-                <div class="slot-message">
-                    <small class="text-muted">Please select provider, facility, and date to see available slots</small>
-                </div>
-            `;
-            if (appointmentTimeInput) {
-                appointmentTimeInput.disabled = true;
-                appointmentTimeInput.value = '';
-            }
-            return;
-        }
-
-        // Show loading state
-        availableSlotsDisplay.innerHTML = `
-            <div class="slot-loading">
-                <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
-                <small class="text-muted">Loading available slots...</small>
-            </div>
-        `;
-
-        // Simulate slight delay for better UX (remove in production if not needed)
-        setTimeout(() => {
-            const result = this.getAvailableSlots(
-                parseInt(providerId),
-                parseInt(facilityId),
-                appointmentDate
-            );
-
-            if (result.slots.length === 0) {
-                availableSlotsDisplay.innerHTML = `
-                    <div class="slot-message">
-                        <small class="text-warning">${result.message}</small>
-                    </div>
-                `;
-                if (appointmentTimeInput) {
-                    appointmentTimeInput.disabled = true;
-                    appointmentTimeInput.value = '';
-                }
-            } else {
-                // Render available slots
-                availableSlotsDisplay.innerHTML = this.renderAvailableSlots(result.slots);
-                if (appointmentTimeInput) {
-                    appointmentTimeInput.disabled = false;
-                }
-            }
-        }, 100);
-    },
-
-    // Render available slots as buttons
-    renderAvailableSlots(slots) {
-        if (!slots || slots.length === 0) {
-            return '<div class="slot-message"><small class="text-muted">No slots available</small></div>';
-        }
-
-        const slotsHtml = slots.map(slot => `
-            <button type="button" 
-                    class="slot-btn available" 
-                    data-time="${slot.time}"
-                    onclick="Appointments.selectTimeSlot('${slot.time}')">
-                ${slot.display}
-            </button>
-        `).join('');
-
-        return `
-            <div class="slot-info">
-                <small class="text-muted">${slots.length} available slot(s) - Click to select:</small>
-            </div>
-            <div class="available-slots-grid">
-                ${slotsHtml}
-            </div>
-        `;
-    },
-
-    // Select a time slot
-    selectTimeSlot(timeString) {
-        const appointmentTimeInput = document.getElementById('appointmentTime');
-        if (appointmentTimeInput) {
-            appointmentTimeInput.value = timeString;
-            
-            // Update visual selection
-            document.querySelectorAll('.slot-btn').forEach(btn => {
-                btn.classList.remove('selected');
-                if (btn.getAttribute('data-time') === timeString) {
-                    btn.classList.add('selected');
-                }
-            });
-
-            // Trigger change event
-            appointmentTimeInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    },
-
-    // Setup event listeners for slot loading
-    setupSlotEventListeners() {
-        const providerSelect = document.getElementById('providerId');
-        const facilitySelect = document.getElementById('facilityId');
-        const dateInput = document.getElementById('appointmentDate');
-
-        if (providerSelect) {
-            providerSelect.addEventListener('change', () => {
-                this.loadAvailableSlots();
-            });
-        }
-
-        if (facilitySelect) {
-            facilitySelect.addEventListener('change', () => {
-                this.loadAvailableSlots();
-            });
-        }
-
-        if (dateInput) {
-            dateInput.addEventListener('change', () => {
-                this.loadAvailableSlots();
-            });
-        }
     }
 };
 

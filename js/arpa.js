@@ -2,6 +2,27 @@
 // MyHubCares - Adherence Risk Prediction Algorithm (ARPA)
 // ============================================================
 
+const LAB_REFERENCE_RANGES = {
+    'CD4 Count': {
+        low: 500,
+        high: 1500,
+        unit: 'cells/μL',
+        interpretation: 'higher_is_better'
+    },
+    'Viral Load': {
+        max: 200,
+        unit: 'copies/mL',
+        interpretation: 'lower_is_better',
+        note: 'Target: undetectable or <200 copies/mL'
+    },
+    'Hemoglobin': {
+        low: 12,
+        high: 16,
+        unit: 'g/dL',
+        interpretation: 'standard'
+    }
+};
+
 const ARPA = {
     // Calculate risk score for a patient
     calculateRiskScore(patientId) {
@@ -201,6 +222,132 @@ const ARPA = {
         return trend;
     },
 
+    // Render latest prescription snapshot
+    renderMedicationList(patientId) {
+        const prescriptions = JSON.parse(localStorage.getItem('prescriptions')) || [];
+        const recentPrescription = prescriptions
+            .filter(rx => rx.patientId === patientId)
+            .sort((a, b) => new Date(b.prescriptionDate) - new Date(a.prescriptionDate))[0];
+
+        if (!recentPrescription || !recentPrescription.drugs || recentPrescription.drugs.length === 0) {
+            return '<p class="text-muted">No active prescriptions recorded.</p>';
+        }
+
+        return `
+            <ul style="list-style:none;padding-left:0;margin:0;">
+                ${recentPrescription.drugs.map(drug => `
+                    <li style="margin-bottom:10px;">
+                        <strong>${drug.drugName}</strong><br>
+                        <small>${drug.dosage || ''} ${drug.frequency ? '• ' + drug.frequency : ''} ${drug.duration ? '• ' + drug.duration : ''}</small>
+                        ${drug.instructions ? `<div class="text-muted" style="font-size:12px;">${drug.instructions}</div>` : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    },
+
+    // Parse numeric value from lab string
+    parseLabValue(value) {
+        if (!value) return null;
+        const normalized = value.toString().trim().toLowerCase();
+        if (normalized.includes('undetectable')) {
+            return 0;
+        }
+        const numeric = parseFloat(normalized.replace(/,/g, ''));
+        return isNaN(numeric) ? null : numeric;
+    },
+
+    // Determine lab status against reference range
+    getLabStatus(testName, resultValue) {
+        const reference = LAB_REFERENCE_RANGES[testName];
+        if (!reference) {
+            return {
+                label: 'No Range',
+                color: '#6b7280',
+                rangeText: 'No reference range configured',
+                reference
+            };
+        }
+
+        const value = this.parseLabValue(resultValue);
+        const buildRangeText = () => {
+            if (reference.note) return reference.note;
+            if (typeof reference.low !== 'undefined' && typeof reference.high !== 'undefined') {
+                return `Normal: ${reference.low} – ${reference.high} ${reference.unit || ''}`;
+            }
+            if (typeof reference.max !== 'undefined') {
+                return `Normal: ≤ ${reference.max} ${reference.unit || ''}`;
+            }
+            return '';
+        };
+
+        if (value === null) {
+            return {
+                label: 'Unknown',
+                color: '#6b7280',
+                rangeText: buildRangeText(),
+                reference
+            };
+        }
+
+        if (typeof reference.max !== 'undefined') {
+            if (value <= reference.max) {
+                return { label: 'Normal', color: '#10b981', rangeText: buildRangeText(), reference };
+            }
+            return { label: 'High', color: '#ef4444', rangeText: buildRangeText(), reference };
+        }
+
+        const low = reference.low ?? Number.NEGATIVE_INFINITY;
+        const high = reference.high ?? Number.POSITIVE_INFINITY;
+
+        if (value < low) {
+            return { label: 'Low', color: '#f59e0b', rangeText: buildRangeText(), reference };
+        }
+        if (value > high) {
+            return { label: 'High', color: '#ef4444', rangeText: buildRangeText(), reference };
+        }
+        return { label: 'Normal', color: '#10b981', rangeText: buildRangeText(), reference };
+    },
+
+    // Render latest lab results snapshot
+    renderLatestLabs(patientId) {
+        const labTests = JSON.parse(localStorage.getItem('labTests')) || [];
+        const latestLabs = labTests
+            .filter(test => test.patientId === patientId)
+            .sort((a, b) => new Date(b.dateDone) - new Date(a.dateDone))
+            .slice(0, 3);
+
+        if (latestLabs.length === 0) {
+            return '<p class="text-muted">No laboratory results recorded.</p>';
+        }
+
+        return `
+            <div>
+                ${latestLabs.map(test => {
+                    const status = this.getLabStatus(test.testName, test.resultValue);
+                    return `
+                        <div style="padding:8px 0;border-bottom:1px solid var(--border-color);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <strong>${test.testName}</strong>
+                                    <div style="font-size:12px;" class="text-muted">${new Date(test.dateDone).toLocaleDateString()}</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <strong>${test.resultValue} ${test.resultUnit || ''}</strong>
+                                    <span style="margin-left:8px;font-weight:bold;color:${status.color};">${status.label}</span>
+                                    <div class="text-muted" style="font-size:12px;">${test.labCode || ''}</div>
+                                </div>
+                            </div>
+                            <div style="font-size:12px;color:#6b7280;margin-top:4px;">
+                                ${status.rangeText}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    },
+
     // Display risk details modal
     showRiskDetails(patientId) {
         const patients = JSON.parse(localStorage.getItem('patients')) || [];
@@ -221,6 +368,38 @@ const ARPA = {
                 </div>
                 <h3 class="mt-2">Risk Level: <span class="risk-badge ${riskScore.level}">${riskScore.level.toUpperCase()}</span></h3>
                 <p>Adherence Rate: <strong>${riskScore.adherenceRate}%</strong></p>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h4>Clinical Interpretation</h4>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Multiple factors</strong>: Risk is never decided by only one aspect; attendance, adherence, and lifestyle indicators are always evaluated together.</li>
+                        <li><strong>Lab results lead</strong>: Persistently low laboratory values flag trouble even when the patient is perfectly compliant.</li>
+                        <li><strong>Possible causes</strong>: Medication may be ineffective (hindi tumatalab) or other hidden issues may be depressing outcomes, so compliance alone cannot lower the risk flag.</li>
+                        <li><strong>Impact on classification</strong>: Patients remain high risk until clinical values improve because therapy goals are still unmet.</li>
+                        <li><strong>Next step</strong>: Providers should reassess and consider changing or adjusting medications when labs stay low.</li>
+                    </ul>
+                    <p class="text-muted" style="margin-top: 12px;"><em>A patient can still be high risk even if compliant, because lab results are the clearest proof that treatment is working.</em></p>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h4>Treatment & Monitoring Snapshot</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h5 style="margin-bottom:6px;">Active Medications</h5>
+                        ${this.renderMedicationList(patientId)}
+                    </div>
+                    <div>
+                        <h5 style="margin-bottom:6px;">Recent Lab Results</h5>
+                        ${this.renderLatestLabs(patientId)}
+                    </div>
+                </div>
             </div>
 
             <div class="card mb-3">
