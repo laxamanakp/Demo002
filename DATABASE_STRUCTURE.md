@@ -501,6 +501,53 @@ This document provides a comprehensive breakdown of the database structure per m
 
 **Indexes**: `idx_medication_adherence_prescription_id`, `idx_medication_adherence_patient_id`, `idx_medication_adherence_date`
 
+#### **4.8. refill_requests** ✨ **NEW/ENHANCED**
+| Column Name | Data Type | Constraints | Required | Description |
+|------------|-----------|-------------|----------|-------------|
+| request_id | UUID | PRIMARY KEY | Yes | Unique request identifier |
+| patient_id | UUID | FOREIGN KEY → patients(patient_id), NOT NULL | Yes | Patient reference |
+| prescription_id | UUID | FOREIGN KEY → prescriptions(prescription_id) | No | Prescription reference |
+| regimen_id | UUID | FOREIGN KEY → art_regimens(regimen_id) | No | ART regimen reference |
+| medication_name | VARCHAR(200) | NOT NULL | Yes | Medication name |
+| quantity_requested | INTEGER | NOT NULL | Yes | Quantity requested |
+| unit | VARCHAR(20) | DEFAULT 'tablets' | Yes | Unit of measure |
+| preferred_pickup_date | DATE | NOT NULL | Yes | Preferred pickup date (future only) |
+| preferred_pickup_time | TIME | NOT NULL | Yes | **NEW** - Preferred pickup time (hourly only) |
+| pickup_facility_id | UUID | FOREIGN KEY → facilities(facility_id), NOT NULL | Yes | Pickup location |
+| patient_notes | TEXT | | No | Patient notes |
+| **🆕 remaining_pill_count** | INTEGER | | No | **NEW** - Current pills remaining (required) |
+| **🆕 pill_status** | ENUM('kulang', 'sakto', 'sobra') | | No | **NEW** - Calculated pill status |
+| **🆕 kulang_explanation** | TEXT | | No | **NEW** - Required if pill_status = 'kulang' |
+| **🆕 is_eligible_for_refill** | BOOLEAN | DEFAULT false | Yes | **NEW** - Eligibility (≤10 pills) |
+| **🆕 pills_per_day** | INTEGER | DEFAULT 1 | Yes | **NEW** - Pills per day for calculation |
+| status | ENUM('pending', 'approved', 'declined', 'cancelled', 'ready', 'dispensed') | DEFAULT 'pending' | Yes | Request status |
+| reviewed_by | UUID | FOREIGN KEY → users(user_id) | No | Case Manager who reviewed |
+| reviewed_at | TIMESTAMPTZ | | No | Review timestamp |
+| review_notes | TEXT | | No | Case Manager review notes |
+| decline_reason | TEXT | | No | Reason if declined |
+| approved_quantity | INTEGER | | No | Quantity approved (may differ) |
+| ready_for_pickup_date | DATE | | No | Actual pickup date |
+| dispensed_by | UUID | FOREIGN KEY → users(user_id) | No | User who dispensed |
+| dispensed_at | TIMESTAMPTZ | | No | Dispensing timestamp |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Creation timestamp |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Last update timestamp |
+| created_by | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Patient who created request |
+
+**Indexes**: `idx_refill_requests_patient_id`, `idx_refill_requests_prescription_id`, `idx_refill_requests_status`, `idx_refill_requests_pill_status`, `idx_refill_requests_is_eligible`
+
+**Constraints:**
+- `CHECK (preferred_pickup_date >= CURRENT_DATE + INTERVAL '1 day')` - No same-day pickup
+- `CHECK (EXTRACT(MINUTE FROM preferred_pickup_time) = 0)` - Hourly intervals only
+- `CHECK (remaining_pill_count IS NOT NULL)` - Pill count required
+- `CHECK (pill_status != 'kulang' OR kulang_explanation IS NOT NULL)` - Explanation required if kulang
+
+**Notes:**
+- **NEW FIELDS:** `remaining_pill_count`, `pill_status`, `kulang_explanation`, `is_eligible_for_refill`, `pills_per_day`, `preferred_pickup_time`
+- `pill_status` is calculated: compares reported pills vs. expected pills (kulang/sakto/sobra)
+- `kulang_explanation` is required when `pill_status = 'kulang'`
+- `is_eligible_for_refill = true` when `remaining_pill_count <= 10`
+- No doctor selection in refill requests (processed by Case Manager only)
+
 ### **Required Data**:
 - **Create Prescription**: patient_id, prescriber_id, medication_id, dosage, frequency, quantity, start_date
 - **Check Inventory**: medication_id, facility_id → query `medication_inventory` for `quantity_on_hand`
@@ -538,9 +585,20 @@ This document provides a comprehensive breakdown of the database structure per m
    - Update `medication_reminders.missed_doses` if missed
    - Log to `audit_log` (D8)
 
+5. **Request Medication Refill (P4.7)** ✨ **NEW**:
+   - Patient enters remaining pill count → validate (required)
+   - System calculates `pill_status` (kulang/sakto/sobra) based on expected vs. reported pills
+   - If `pill_status = 'kulang'` → require `kulang_explanation`
+   - Check eligibility: `is_eligible_for_refill = (remaining_pill_count <= 10)`
+   - Create refill request → save to `refill_requests` (D4)
+   - Case Manager reviews → approve/decline → update `refill_requests.status`
+   - If approved → set `ready_for_pickup_date`
+   - When dispensed → update `dispensed_by`, `dispensed_at`
+   - Log to `audit_log` (D8)
+
 ### **Data Retrieval Points**:
 - **D2 (Patients Database)**: Patient information for prescriptions
-- **D4 (Medications & Inventory)**: All medication, prescription, inventory, dispensing, reminder, and adherence data
+- **D4 (Medications & Inventory)**: All medication, prescription, inventory, dispensing, reminder, adherence, and refill request data
 - **D8 (Audit Log)**: All medication-related events
 
 ---
@@ -844,7 +902,7 @@ This document provides a comprehensive breakdown of the database structure per m
 ### **Data Retrieval Points**:
 - **D2 (Patients Database)**: Patient information for appointments
 - **D1 (Users Database)**: Provider information and availability
-- **D6 (Appointments Calendar)**: All appointments, availability slots, and reminders
+- **D6 (Appointments Calendar)**: All appointments, availability slots, reminders, appointment_requests, doctor_assignments, doctor_conflicts
 - **D8 (Audit Log)**: All appointment booking and cancellation events
 
 ---
@@ -1106,6 +1164,13 @@ This document provides a comprehensive breakdown of the database structure per m
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Last update timestamp |
 | updated_by | UUID | FOREIGN KEY → users(user_id) | No | User who updated |
 
+**New Settings** ✨:
+- `scheduling.max_patients_per_day` (default: 20) - Maximum patients per day across all doctors
+- `scheduling.max_slots_per_doctor` (default: 8) - Maximum appointments per doctor per day
+- `scheduling.slot_duration_minutes` (default: 60) - Appointment slot duration (hourly only)
+- `scheduling.min_advance_days` (default: 1) - Minimum days in advance (no same-day)
+- `scheduling.allow_same_day_booking` (default: false) - Always false per requirements
+
 #### **9.3. user_facility_assignments**
 | Column Name | Data Type | Constraints | Required | Description |
 |------------|-----------|-------------|----------|-------------|
@@ -1162,6 +1227,7 @@ This document provides a comprehensive breakdown of the database structure per m
 
 3. **System Configuration (P9.5)**:
    - Admin updates settings → save to `system_settings` (D9)
+   - **NEW**: Admin configures scheduling settings (max patients/day, max slots/doctor, slot duration)
    - Apply configuration → update system behavior
    - Log audit entry to `audit_log` (D8)
 
@@ -1756,9 +1822,9 @@ This document provides a comprehensive breakdown of the database structure per m
    - Data Flow: Clinical visit → Vital signs → BMI calculation → Diagnoses → Visit history
 
 4. **D4: Medications & Inventory**
-   - Tables: `medications`, `prescriptions`, `prescription_items`, `medication_inventory`, `dispense_events`, `medication_reminders`, `medication_adherence`
+   - Tables: `medications`, `prescriptions`, `prescription_items`, `medication_inventory`, `dispense_events`, `medication_reminders`, `medication_adherence`, `refill_requests`
    - Used by: P4 (Medication Management), P2 (ARPA calculation), P8 (Reports), P15 (ART Regimens)
-   - Data Flow: Prescription → Inventory check → Dispensing → Reminders → Adherence tracking
+   - Data Flow: Prescription → Inventory check → Dispensing → Reminders → Adherence tracking → Refill requests (with pill count validation)
 
 5. **D5: Lab Results**
    - Tables: `lab_orders`, `lab_results`, `lab_files`
@@ -1766,9 +1832,10 @@ This document provides a comprehensive breakdown of the database structure per m
    - Data Flow: Lab order → Result entry → Validation → Critical alerts → Test history
 
 6. **D6: Appointments Calendar**
-   - Tables: `appointments`, `availability_slots`, `appointment_reminders`
+   - Tables: `appointments`, `availability_slots`, `appointment_reminders`, `appointment_requests`, `doctor_assignments`, `doctor_conflicts`
    - Used by: P6 (Appointment Scheduling), P2 (ARPA calculation), P8 (Reports)
-   - Data Flow: Appointment booking → Availability check → Reminder generation → Appointment history
+   - Data Flow: Appointment request → Case Manager review → Appointment booking → Availability check → Reminder generation → Appointment history
+   - **NEW**: Admin doctor availability management → Doctor assignments → Conflict management → Lock protection
 
 7. **D7: Referrals & Counseling**
    - Tables: `referrals`, `counseling_sessions`, `hts_sessions`, `care_tasks`
