@@ -222,6 +222,53 @@ textarea {
 }
 
 /* ============================================================
+   Tabs
+   ============================================================ */
+
+.tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border-color);
+    margin: -20px -20px 0 -20px;
+    padding: 0 20px;
+}
+
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 15px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-btn .badge {
+    font-size: 11px;
+    padding: 2px 6px;
+}
+
+.tab-content {
+    padding: 20px 0;
+}
+
+/* ============================================================
    Cards
    ============================================================ */
 
@@ -749,5 +796,101 @@ tr:hover {
         padding: 8px 12px;
         font-size: 12px;
     }
+}
+
+/* ============================================================
+   Appointment Request Cards
+   ============================================================ */
+
+.request-card {
+    border-left: 4px solid var(--warning-color);
+    transition: all 0.2s ease;
+}
+
+.request-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.request-card[data-status="pending"] {
+    border-left-color: var(--warning-color);
+}
+
+.request-card[data-status="approved"] {
+    border-left-color: var(--success-color);
+}
+
+.request-card[data-status="declined"] {
+    border-left-color: var(--danger-color);
+}
+
+.request-card[data-status="cancelled"] {
+    border-left-color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Slot selection buttons in request modal */
+.slot-btn {
+    transition: all 0.15s ease;
+}
+
+.slot-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+}
+
+/* Status indicator dots */
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.status-dot.pending {
+    background-color: var(--warning-color);
+}
+
+.status-dot.approved {
+    background-color: var(--success-color);
+}
+
+.status-dot.declined {
+    background-color: var(--danger-color);
+}
+
+.status-dot.cancelled {
+    background-color: var(--text-secondary);
+}
+
+/* Request notification badges */
+.request-badge {
+    position: relative;
+}
+
+.request-badge::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--danger-color);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+}
+
+/* Pending requests highlight animation */
+@keyframes pulse-pending {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.request-card[data-status="pending"]:first-child {
+    animation: pulse-pending 2s infinite;
 }
 

@@ -136,7 +136,8 @@ const App = {
                 }
                 break;
             case 'reminders':
-                Reminders.loadRemindersPage(contentArea);
+            case 'my-medications':
+                Reminders.loadMedicationsPage(contentArea);
                 break;
             case 'education':
                 Education.loadEducationPage(contentArea);
@@ -195,6 +196,12 @@ const App = {
             case 'care-tasks':
                 if (typeof CareTasks !== 'undefined') CareTasks.loadCareTasksPage(contentArea);
                 break;
+            case 'appointment-requests':
+                if (typeof AppointmentRequests !== 'undefined') AppointmentRequests.loadRequestsPage(contentArea);
+                break;
+            case 'refill-requests':
+                if (typeof RefillRequests !== 'undefined') RefillRequests.loadRequestsPage(contentArea);
+                break;
             case 'reporting':
                 if (typeof Reporting !== 'undefined') Reporting.loadReportingPage(contentArea);
                 break;
@@ -218,6 +225,9 @@ const App = {
             dashboard: 'Dashboard',
             patients: 'Patient Management',
             appointments: 'Appointments',
+            'appointment-requests': 'Appointment Requests',
+            'refill-requests': 'Medication Refill Requests',
+            'my-medications': 'My Medications',
             inventory: 'Inventory Management',
             prescriptions: 'Prescriptions',
             'lab-tests': 'Laboratory Tests',
@@ -272,6 +282,13 @@ const App = {
         const prescriptions = JSON.parse(localStorage.getItem('prescriptions')) || [];
         const recentPrescriptions = prescriptions.filter(p => p.patientId === patientId).slice(0, 3);
 
+        // Get refill requests
+        const refillRequests = JSON.parse(localStorage.getItem('refill_requests')) || [];
+        const readyRefills = refillRequests.filter(r => 
+            r.patient_id === patientId && 
+            ['approved', 'ready'].includes(r.status)
+        );
+
         let html = `
             <div class="dashboard-header">
                 <h2>Welcome back, ${patient ? patient.firstName : 'Patient'}!</h2>
@@ -308,9 +325,21 @@ const App = {
                         <div class="stat-card-icon warning">💊</div>
                     </div>
                 </div>
+
+                <div class="stat-card" ${readyRefills.length > 0 ? 'style="border: 2px solid var(--success-color);"' : ''}>
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-value">${readyRefills.length}</div>
+                            <div class="stat-label">Ready for Pickup</div>
+                        </div>
+                        <div class="stat-card-icon ${readyRefills.length > 0 ? 'success' : 'info'}">📦</div>
+                    </div>
+                </div>
             </div>
 
-            <div class="card">
+            ${readyRefills.length > 0 ? this.renderReadyRefillsCard(readyRefills) : ''}
+
+            <div class="card ${readyRefills.length > 0 ? 'mt-3' : ''}">
                 <div class="card-header">
                     <h3 class="card-title">Upcoming Appointments</h3>
                     <button class="btn btn-primary btn-sm" onclick="window.location.hash='appointments'">
@@ -325,6 +354,9 @@ const App = {
             <div class="card mt-3">
                 <div class="card-header">
                     <h3 class="card-title">Today's Medications</h3>
+                    <button class="btn btn-primary btn-sm" onclick="window.location.hash='my-medications'">
+                        Manage Medications
+                    </button>
                 </div>
                 <div class="card-body">
                     ${activeReminders.length > 0 ? this.renderReminderList(activeReminders) : '<p class="text-muted">No medication reminders set</p>'}
@@ -333,6 +365,42 @@ const App = {
         `;
 
         container.innerHTML = html;
+    },
+
+    // Render ready refills card
+    renderReadyRefillsCard(readyRefills) {
+        const facilities = JSON.parse(localStorage.getItem('facilities')) || [];
+
+        return `
+            <div class="card" style="border: 2px solid var(--success-color); background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);">
+                <div class="card-header" style="border-bottom-color: var(--success-color);">
+                    <h3 class="card-title" style="color: var(--success-color);">📦 Medications Ready for Pickup</h3>
+                    <button class="btn btn-success btn-sm" onclick="window.location.hash='my-medications'">
+                        View All
+                    </button>
+                </div>
+                <div class="card-body">
+                    ${readyRefills.map(refill => {
+                        const facility = facilities.find(f => f.id === refill.pickup_facility_id);
+                        return `
+                            <div class="patient-card mb-2" style="background: white;">
+                                <div class="patient-info">
+                                    <div>
+                                        <strong>💊 ${refill.medication_name}</strong>
+                                        <div class="patient-meta">
+                                            <span>📦 ${refill.approved_quantity || refill.quantity_requested} ${refill.unit || 'tablets'}</span>
+                                            <span>📅 ${new Date(refill.ready_for_pickup_date || refill.preferred_pickup_date).toLocaleDateString()}</span>
+                                        </div>
+                                        <p class="text-muted mt-1">🏥 ${facility ? facility.name : 'N/A'}</p>
+                                    </div>
+                                </div>
+                                <span class="badge badge-success">✅ Ready</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
     },
 
     // Render appointment list

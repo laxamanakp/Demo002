@@ -59,6 +59,18 @@ const Dashboard = {
         const stats = this.calculateStatistics();
         const alerts = this.generateAlerts();
 
+        // Get pending appointment requests widget for case manager/admin
+        let appointmentRequestsWidget = '';
+        if ((role === 'case_manager' || role === 'admin') && typeof AppointmentRequests !== 'undefined') {
+            appointmentRequestsWidget = AppointmentRequests.getCaseManagerWidget();
+        }
+
+        // Get pending refill requests widget for case manager/admin
+        let refillRequestsWidget = '';
+        if ((role === 'case_manager' || role === 'admin') && typeof RefillRequests !== 'undefined') {
+            refillRequestsWidget = RefillRequests.getCaseManagerWidget();
+        }
+
         let html = `
             <div class="dashboard-header">
                 <h2>Dashboard Overview</h2>
@@ -66,6 +78,9 @@ const Dashboard = {
             </div>
 
             ${this.renderStatistics(stats)}
+
+            ${appointmentRequestsWidget}
+            ${refillRequestsWidget}
 
             <div class="dashboard-grid mt-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
                 <div class="card">

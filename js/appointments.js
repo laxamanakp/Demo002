@@ -20,19 +20,54 @@ const Appointments = {
             appointments = appointments.filter(apt => apt.patientId === currentUser.patientId);
         }
 
+        // Get pending requests count for patient
+        let pendingRequestsBanner = '';
+        if (role === 'patient' && typeof AppointmentRequests !== 'undefined') {
+            const pendingRequests = AppointmentRequests.getRequestsByPatient(currentUser.patientId)
+                .filter(r => r.status === 'pending');
+            if (pendingRequests.length > 0) {
+                pendingRequestsBanner = `
+                    <div class="alert alert-info mb-3">
+                        <strong>📋 You have ${pendingRequests.length} pending appointment request(s)</strong> waiting for approval.
+                        <button class="btn btn-sm btn-outline" onclick="AppointmentRequests.loadMyRequestsPage(document.getElementById('contentArea'))" style="margin-left: 10px;">
+                            View Requests
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Determine which button to show based on role
+        let appointmentButton = '';
+        if (role === 'patient') {
+            // Patients must submit requests for approval
+            appointmentButton = `
+                <button class="btn btn-primary btn-sm" onclick="AppointmentRequests.showRequestModal()">
+                    📝 Request Appointment
+                </button>
+            `;
+        } else {
+            // Staff can directly book appointments
+            appointmentButton = `
+                <button class="btn btn-primary btn-sm" onclick="Appointments.showAddAppointmentModal()">
+                    Book Appointment
+                </button>
+            `;
+        }
+
         let html = `
+            ${pendingRequestsBanner}
             <div class="tabs">
                 <div class="tab active" data-tab="calendar">Calendar View</div>
                 <div class="tab" data-tab="list">List View</div>
+                ${role === 'patient' ? '<div class="tab" data-tab="requests">My Requests</div>' : ''}
             </div>
 
             <div class="tab-content active" id="calendarTab">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Appointment Calendar</h3>
-                        <button class="btn btn-primary btn-sm" onclick="Appointments.showAddAppointmentModal()">
-                            Book Appointment
-                        </button>
+                        ${appointmentButton}
                     </div>
                     <div class="card-body">
                         <div id="calendarContainer"></div>
@@ -53,9 +88,7 @@ const Appointments = {
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary btn-sm" onclick="Appointments.showAddAppointmentModal()">
-                            Book Appointment
-                        </button>
+                        ${appointmentButton}
                     </div>
                     <div class="card-body">
                         <div id="appointmentList">
@@ -64,6 +97,24 @@ const Appointments = {
                     </div>
                 </div>
             </div>
+
+            ${role === 'patient' ? `
+            <div class="tab-content" id="requestsTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📝 My Appointment Requests</h3>
+                        <button class="btn btn-primary btn-sm" onclick="AppointmentRequests.showRequestModal()">
+                            📝 Request Appointment
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="requestsContent">
+                            <p class="text-muted text-center py-4">Loading requests...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         `;
 
         container.innerHTML = html;
@@ -107,6 +158,15 @@ const Appointments = {
                 
                 if (tabName === 'calendar') {
                     document.getElementById('calendarTab').classList.add('active');
+                } else if (tabName === 'requests') {
+                    // Load patient requests tab
+                    if (typeof AppointmentRequests !== 'undefined') {
+                        document.getElementById('requestsTab').classList.add('active');
+                        const currentUser = Auth.getCurrentUser();
+                        const requests = AppointmentRequests.getRequestsByPatient(currentUser.patientId);
+                        document.getElementById('requestsContent').innerHTML = 
+                            AppointmentRequests.renderPatientRequestsList(requests);
+                    }
                 } else {
                     document.getElementById('listTab').classList.add('active');
                 }

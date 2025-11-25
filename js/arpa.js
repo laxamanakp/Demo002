@@ -2,24 +2,215 @@
 // MyHubCares - Adherence Risk Prediction Algorithm (ARPA)
 // ============================================================
 
+// ============================================================
+// HIV Lab Reference Ranges with Risk Stratification
+// ============================================================
+
 const LAB_REFERENCE_RANGES = {
-    'CD4 Count': {
-        low: 500,
-        high: 1500,
-        unit: 'cells/μL',
-        interpretation: 'higher_is_better'
-    },
+    // 1. Viral Load (HIV RNA)
     'Viral Load': {
-        max: 200,
         unit: 'copies/mL',
         interpretation: 'lower_is_better',
-        note: 'Target: undetectable or <200 copies/mL'
+        ranges: [
+            { max: 50, level: 'optimal', label: 'Undetectable', color: '#10b981', riskScore: 0 },
+            { max: 200, level: 'low', label: 'Controlled', color: '#22c55e', riskScore: 10 },
+            { max: 10000, level: 'moderate', label: 'Moderate', color: '#f59e0b', riskScore: 40 },
+            { max: Infinity, level: 'high', label: 'High Risk', color: '#ef4444', riskScore: 80 }
+        ],
+        systemAction: 'High viral load increases ARPA risk score, flags for adherence counseling or treatment review',
+        clinicalNote: 'Target: Undetectable (<50 copies/mL). Sustained viremia may indicate treatment failure or non-adherence.'
     },
+
+    // 2. CD4 Count
+    'CD4 Count': {
+        unit: 'cells/μL',
+        interpretation: 'higher_is_better',
+        ranges: [
+            { min: 500, max: 1500, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { min: 350, max: 499, level: 'mild', label: 'Mild Immunosuppression', color: '#22c55e', riskScore: 15 },
+            { min: 200, max: 349, level: 'moderate', label: 'Moderate Immunosuppression', color: '#f59e0b', riskScore: 45 },
+            { min: 0, max: 199, level: 'severe', label: 'Severe Immunosuppression', color: '#ef4444', riskScore: 90 }
+        ],
+        systemAction: 'CD4 <200 triggers intensive follow-up, opportunistic infection alert, and patient prioritization',
+        clinicalNote: 'CD4 <200 = AIDS-defining. Requires OI prophylaxis and urgent intervention.'
+    },
+
+    // 3. Creatinine (Kidney Function)
+    'Creatinine': {
+        unit: 'mg/dL',
+        interpretation: 'standard',
+        ranges: [
+            { min: 0.6, max: 1.3, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { min: 1.31, max: 1.5, level: 'mild', label: 'Mild Impairment', color: '#eab308', riskScore: 20 },
+            { min: 1.51, max: 2.0, level: 'moderate', label: 'Moderate Impairment', color: '#f59e0b', riskScore: 50 },
+            { min: 2.01, max: Infinity, level: 'severe', label: 'Severe Impairment', color: '#ef4444', riskScore: 85 }
+        ],
+        systemAction: 'Elevated creatinine triggers alerts for ARV dose adjustment or nephrology referral',
+        clinicalNote: 'Critical for Tenofovir (TDF) monitoring. Consider switch to TAF if impaired.'
+    },
+
+    // 4. HBsAg (Hepatitis B Surface Antigen)
+    'HBsAg': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'Negative', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'Positive', level: 'positive', label: 'HBV Co-infection', color: '#ef4444', riskScore: 35 }
+        ],
+        systemAction: 'Positive HBsAg modifies ARV selection (requires TDF/TAF-containing regimen)',
+        clinicalNote: 'HBV co-infection requires Tenofovir + Lamivudine/Emtricitabine. Monitor HBV DNA and liver enzymes.'
+    },
+
+    // 5. Hepatitis C (Anti-HCV)
+    'Anti-HCV': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'Negative', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'Positive', level: 'positive', label: 'HCV Exposure', color: '#f59e0b', riskScore: 25 }
+        ],
+        systemAction: 'Positive Anti-HCV requires HCV RNA confirmation and liver evaluation',
+        clinicalNote: 'If HCV RNA positive, consider DAA treatment. Monitor for liver fibrosis.'
+    },
+
+    // 6. Chest X-Ray (CXR)
+    'Chest X-Ray': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'Normal', level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { value: 'Abnormal', level: 'abnormal', label: 'Abnormal', color: '#ef4444', riskScore: 60 }
+        ],
+        findings: ['Infiltrates', 'Cavitation', 'Fibrosis', 'Effusion', 'Lymphadenopathy'],
+        systemAction: 'Abnormal CXR triggers TB workup (GeneXpert), pulmonary evaluation, ARPA risk escalation',
+        clinicalNote: 'Any abnormality in HIV+ patient warrants TB investigation.'
+    },
+
+    // 7. GeneXpert MTB/RIF
+    'GeneXpert': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'MTB Not Detected', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'Negative', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'MTB Detected, RIF Sensitive', level: 'tb_sensitive', label: 'TB (Drug Sensitive)', color: '#f59e0b', riskScore: 50 },
+            { value: 'MTB Detected, RIF Resistant', level: 'tb_resistant', label: 'TB (Drug Resistant)', color: '#ef4444', riskScore: 85 }
+        ],
+        quantitative: ['Trace', 'Very Low', 'Low', 'Medium', 'High'],
+        systemAction: 'Positive result triggers TB treatment protocol. RIF resistance requires MDR-TB regimen.',
+        clinicalNote: 'Drug-resistant TB requires specialist referral and extended treatment.'
+    },
+
+    // 8. HIV Drug Resistance (Genotype)
+    'HIVDR': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'No Mutations', level: 'normal', label: 'No Resistance', color: '#10b981', riskScore: 0 },
+            { value: 'NRTI Mutations', level: 'resistance', label: 'NRTI Resistance', color: '#f59e0b', riskScore: 45 },
+            { value: 'NNRTI Mutations', level: 'resistance', label: 'NNRTI Resistance', color: '#f59e0b', riskScore: 45 },
+            { value: 'PI Mutations', level: 'resistance', label: 'PI Resistance', color: '#f59e0b', riskScore: 50 },
+            { value: 'INSTI Mutations', level: 'resistance', label: 'INSTI Resistance', color: '#ef4444', riskScore: 60 },
+            { value: 'Multi-class Resistance', level: 'high_resistance', label: 'Multi-class Resistance', color: '#ef4444', riskScore: 80 }
+        ],
+        systemAction: 'Resistance mutations guide ARV regimen adjustment. Critical for viral suppression.',
+        clinicalNote: 'Genotype results guide selection of active ARV agents.'
+    },
+
+    // 9. ALT (Liver Function)
+    'ALT': {
+        unit: 'U/L',
+        interpretation: 'lower_is_better',
+        ranges: [
+            { max: 40, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { max: 80, level: 'mild', label: 'Mild Elevation', color: '#eab308', riskScore: 15 },
+            { max: 200, level: 'moderate', label: 'Moderate Elevation', color: '#f59e0b', riskScore: 40 },
+            { max: Infinity, level: 'severe', label: 'Severe Elevation', color: '#ef4444', riskScore: 70 }
+        ],
+        systemAction: 'Elevated ALT may require ARV adjustment. Monitor for hepatotoxicity.',
+        clinicalNote: 'Common with NVP, EFV. Rule out viral hepatitis if persistently elevated.'
+    },
+
+    // 10. AST (Liver Function)
+    'AST': {
+        unit: 'U/L',
+        interpretation: 'lower_is_better',
+        ranges: [
+            { max: 40, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { max: 80, level: 'mild', label: 'Mild Elevation', color: '#eab308', riskScore: 15 },
+            { max: 200, level: 'moderate', label: 'Moderate Elevation', color: '#f59e0b', riskScore: 40 },
+            { max: Infinity, level: 'severe', label: 'Severe Elevation', color: '#ef4444', riskScore: 70 }
+        ],
+        systemAction: 'Elevated AST may indicate liver damage. Evaluate with ALT ratio.',
+        clinicalNote: 'AST:ALT ratio >2 may suggest alcoholic liver disease.'
+    },
+
+    // 11. Hemoglobin
     'Hemoglobin': {
-        low: 12,
-        high: 16,
         unit: 'g/dL',
-        interpretation: 'standard'
+        interpretation: 'standard',
+        ranges: [
+            { min: 12, max: 18, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { min: 10, max: 11.9, level: 'mild', label: 'Mild Anemia', color: '#eab308', riskScore: 15 },
+            { min: 8, max: 9.9, level: 'moderate', label: 'Moderate Anemia', color: '#f59e0b', riskScore: 35 },
+            { min: 0, max: 7.9, level: 'severe', label: 'Severe Anemia', color: '#ef4444', riskScore: 70 }
+        ],
+        systemAction: 'Severe anemia may contraindicate AZT. Investigate cause.',
+        clinicalNote: 'AZT can cause bone marrow suppression. Switch to TDF/TAF if needed.'
+    },
+
+    // 12. Platelet Count
+    'Platelet Count': {
+        unit: 'x10³/μL',
+        interpretation: 'standard',
+        ranges: [
+            { min: 150, max: 400, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { min: 100, max: 149, level: 'mild', label: 'Mild Thrombocytopenia', color: '#eab308', riskScore: 15 },
+            { min: 50, max: 99, level: 'moderate', label: 'Moderate Thrombocytopenia', color: '#f59e0b', riskScore: 40 },
+            { min: 0, max: 49, level: 'severe', label: 'Severe Thrombocytopenia', color: '#ef4444', riskScore: 70 }
+        ],
+        systemAction: 'Low platelets may indicate bone marrow suppression or ITP.',
+        clinicalNote: 'HIV-associated thrombocytopenia often improves with ART.'
+    },
+
+    // 13. Blood Glucose (Fasting)
+    'Blood Glucose': {
+        unit: 'mg/dL',
+        interpretation: 'standard',
+        ranges: [
+            { min: 70, max: 99, level: 'normal', label: 'Normal', color: '#10b981', riskScore: 0 },
+            { min: 100, max: 125, level: 'prediabetes', label: 'Prediabetes', color: '#eab308', riskScore: 20 },
+            { min: 126, max: Infinity, level: 'diabetes', label: 'Diabetes Range', color: '#ef4444', riskScore: 45 }
+        ],
+        systemAction: 'Elevated glucose requires metabolic screening. Some ARVs affect glucose metabolism.',
+        clinicalNote: 'PIs and some NRTIs can cause insulin resistance.'
+    },
+
+    // 14. Total Cholesterol
+    'Cholesterol': {
+        unit: 'mg/dL',
+        interpretation: 'lower_is_better',
+        ranges: [
+            { max: 200, level: 'normal', label: 'Desirable', color: '#10b981', riskScore: 0 },
+            { max: 239, level: 'borderline', label: 'Borderline High', color: '#eab308', riskScore: 15 },
+            { max: Infinity, level: 'high', label: 'High', color: '#ef4444', riskScore: 35 }
+        ],
+        systemAction: 'Elevated cholesterol may require lipid-lowering therapy or ARV switch.',
+        clinicalNote: 'EFV and PIs can cause dyslipidemia. Consider INSTI-based regimen.'
+    },
+
+    // 15. RPR/VDRL (Syphilis)
+    'RPR': {
+        unit: '',
+        interpretation: 'qualitative',
+        ranges: [
+            { value: 'Non-reactive', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'Negative', level: 'normal', label: 'Negative', color: '#10b981', riskScore: 0 },
+            { value: 'Reactive', level: 'positive', label: 'Syphilis Detected', color: '#ef4444', riskScore: 30 },
+            { value: 'Positive', level: 'positive', label: 'Syphilis Detected', color: '#ef4444', riskScore: 30 }
+        ],
+        systemAction: 'Reactive RPR requires confirmatory testing and treatment.',
+        clinicalNote: 'Syphilis co-infection common in HIV. Treat with Penicillin G.'
     }
 };
 
@@ -257,56 +448,234 @@ const ARPA = {
         return isNaN(numeric) ? null : numeric;
     },
 
-    // Determine lab status against reference range
+    // Determine lab status against reference range (legacy compatibility)
     getLabStatus(testName, resultValue) {
+        return this.getLabInterpretation(testName, resultValue);
+    },
+
+    // Get comprehensive lab interpretation with risk level
+    getLabInterpretation(testName, resultValue) {
         const reference = LAB_REFERENCE_RANGES[testName];
         if (!reference) {
             return {
-                label: 'No Range',
+                level: 'unknown',
+                label: 'No Reference',
                 color: '#6b7280',
+                riskScore: 0,
                 rangeText: 'No reference range configured',
-                reference
+                systemAction: null,
+                clinicalNote: null
             };
         }
 
-        const value = this.parseLabValue(resultValue);
-        const buildRangeText = () => {
-            if (reference.note) return reference.note;
-            if (typeof reference.low !== 'undefined' && typeof reference.high !== 'undefined') {
-                return `Normal: ${reference.low} – ${reference.high} ${reference.unit || ''}`;
+        // Handle qualitative tests (HBsAg, GeneXpert, RPR, etc.)
+        if (reference.interpretation === 'qualitative') {
+            const normalizedValue = (resultValue || '').toString().trim().toLowerCase();
+            for (const range of reference.ranges) {
+                if (normalizedValue.includes(range.value.toLowerCase())) {
+                    return {
+                        level: range.level,
+                        label: range.label,
+                        color: range.color,
+                        riskScore: range.riskScore,
+                        rangeText: `Expected: ${reference.ranges[0].value}`,
+                        systemAction: reference.systemAction,
+                        clinicalNote: reference.clinicalNote
+                    };
+                }
             }
-            if (typeof reference.max !== 'undefined') {
-                return `Normal: ≤ ${reference.max} ${reference.unit || ''}`;
-            }
-            return '';
-        };
-
-        if (value === null) {
+            // Default for unmatched qualitative
             return {
-                label: 'Unknown',
+                level: 'unknown',
+                label: resultValue || 'Unknown',
                 color: '#6b7280',
-                rangeText: buildRangeText(),
-                reference
+                riskScore: 0,
+                rangeText: '',
+                systemAction: reference.systemAction,
+                clinicalNote: reference.clinicalNote
             };
         }
 
-        if (typeof reference.max !== 'undefined') {
-            if (value <= reference.max) {
-                return { label: 'Normal', color: '#10b981', rangeText: buildRangeText(), reference };
+        // Handle quantitative tests
+        const value = this.parseLabValue(resultValue);
+        if (value === null) {
+            // Check for special values like "Undetectable"
+            const normalizedValue = (resultValue || '').toString().trim().toLowerCase();
+            if (normalizedValue.includes('undetectable') || normalizedValue.includes('<20') || normalizedValue.includes('< 20')) {
+                const optimalRange = reference.ranges.find(r => r.level === 'optimal' || r.level === 'normal');
+                if (optimalRange) {
+                    return {
+                        level: optimalRange.level,
+                        label: optimalRange.label,
+                        color: optimalRange.color,
+                        riskScore: optimalRange.riskScore,
+                        rangeText: this.buildRangeText(reference),
+                        systemAction: reference.systemAction,
+                        clinicalNote: reference.clinicalNote,
+                        value: 0
+                    };
+                }
             }
-            return { label: 'High', color: '#ef4444', rangeText: buildRangeText(), reference };
+            return {
+                level: 'unknown',
+                label: 'Unable to parse',
+                color: '#6b7280',
+                riskScore: 0,
+                rangeText: this.buildRangeText(reference),
+                systemAction: reference.systemAction,
+                clinicalNote: reference.clinicalNote
+            };
         }
 
-        const low = reference.low ?? Number.NEGATIVE_INFINITY;
-        const high = reference.high ?? Number.POSITIVE_INFINITY;
+        // Find matching range based on interpretation type
+        for (const range of reference.ranges) {
+            let matches = false;
+            
+            if (reference.interpretation === 'lower_is_better') {
+                // For viral load, ALT, cholesterol - check max only
+                if (value <= (range.max || Infinity)) {
+                    matches = true;
+                }
+            } else if (reference.interpretation === 'higher_is_better') {
+                // For CD4 - higher values in range are better
+                const min = range.min ?? 0;
+                const max = range.max ?? Infinity;
+                if (value >= min && value <= max) {
+                    matches = true;
+                }
+            } else {
+                // Standard range check (both min and max matter)
+                const min = range.min ?? 0;
+                const max = range.max ?? Infinity;
+                if (value >= min && value <= max) {
+                    matches = true;
+                }
+            }
 
-        if (value < low) {
-            return { label: 'Low', color: '#f59e0b', rangeText: buildRangeText(), reference };
+            if (matches) {
+                return {
+                    level: range.level,
+                    label: range.label,
+                    color: range.color,
+                    riskScore: range.riskScore,
+                    rangeText: this.buildRangeText(reference),
+                    systemAction: reference.systemAction,
+                    clinicalNote: reference.clinicalNote,
+                    value: value
+                };
+            }
         }
-        if (value > high) {
-            return { label: 'High', color: '#ef4444', rangeText: buildRangeText(), reference };
+
+        // Fallback - check if value is below all ranges or above all ranges
+        const lowestRange = reference.ranges[reference.ranges.length - 1];
+        return {
+            level: lowestRange.level || 'unknown',
+            label: lowestRange.label || 'Out of range',
+            color: lowestRange.color || '#ef4444',
+            riskScore: lowestRange.riskScore || 50,
+            rangeText: this.buildRangeText(reference),
+            systemAction: reference.systemAction,
+            clinicalNote: reference.clinicalNote,
+            value: value
+        };
+    },
+
+    // Build range text for display
+    buildRangeText(reference) {
+        if (!reference) return '';
+        
+        const normalRange = reference.ranges ? reference.ranges.find(r => r.level === 'normal' || r.level === 'optimal') : null;
+        if (normalRange) {
+            if (normalRange.min !== undefined && normalRange.max !== undefined && normalRange.max !== Infinity) {
+                return `Normal: ${normalRange.min} – ${normalRange.max} ${reference.unit || ''}`;
+            }
+            if (normalRange.max !== undefined && normalRange.max !== Infinity) {
+                return `Target: < ${normalRange.max} ${reference.unit || ''}`;
+            }
+            if (normalRange.min !== undefined) {
+                return `Target: > ${normalRange.min} ${reference.unit || ''}`;
+            }
         }
-        return { label: 'Normal', color: '#10b981', rangeText: buildRangeText(), reference };
+        
+        if (reference.clinicalNote) {
+            return reference.clinicalNote.substring(0, 60) + (reference.clinicalNote.length > 60 ? '...' : '');
+        }
+        
+        return '';
+    },
+
+    // Calculate lab-based risk score for ARPA integration
+    calculateLabRiskScore(patientId) {
+        const labTests = JSON.parse(localStorage.getItem('labTests')) || [];
+        const patientLabs = labTests.filter(l => l.patientId === patientId);
+
+        if (patientLabs.length === 0) return { score: 50, details: [], hasData: false };
+
+        // Get most recent result for each test type
+        const latestByType = {};
+        patientLabs.forEach(lab => {
+            if (!latestByType[lab.testName] || new Date(lab.dateDone) > new Date(latestByType[lab.testName].dateDone)) {
+                latestByType[lab.testName] = lab;
+            }
+        });
+
+        let totalRisk = 0;
+        let testCount = 0;
+        const details = [];
+
+        // Priority tests for HIV care (weighted more heavily)
+        const priorityTests = ['Viral Load', 'CD4 Count', 'Creatinine', 'HBsAg', 'GeneXpert', 'HIVDR'];
+        
+        Object.values(latestByType).forEach(lab => {
+            const interpretation = this.getLabInterpretation(lab.testName, lab.resultValue);
+            const isPriority = priorityTests.includes(lab.testName);
+            const weight = isPriority ? 1.5 : 1;
+            
+            totalRisk += interpretation.riskScore * weight;
+            testCount += weight;
+
+            details.push({
+                testName: lab.testName,
+                value: lab.resultValue,
+                unit: lab.resultUnit,
+                level: interpretation.level,
+                label: interpretation.label,
+                riskScore: interpretation.riskScore,
+                color: interpretation.color,
+                date: lab.dateDone,
+                systemAction: interpretation.systemAction,
+                clinicalNote: interpretation.clinicalNote
+            });
+        });
+
+        const averageRisk = testCount > 0 ? Math.round(totalRisk / testCount) : 50;
+
+        return {
+            score: averageRisk,
+            details: details.sort((a, b) => b.riskScore - a.riskScore),
+            hasData: true
+        };
+    },
+
+    // Get critical lab alerts for a patient
+    getCriticalLabAlerts(patientId) {
+        const labRisk = this.calculateLabRiskScore(patientId);
+        const alerts = [];
+
+        labRisk.details.forEach(lab => {
+            if (lab.riskScore >= 45) {
+                alerts.push({
+                    testName: lab.testName,
+                    value: lab.value,
+                    label: lab.label,
+                    color: lab.color,
+                    action: lab.systemAction,
+                    date: lab.date
+                });
+            }
+        });
+
+        return alerts;
     },
 
     // Render latest lab results snapshot

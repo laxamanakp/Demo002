@@ -157,6 +157,8 @@ const Auth = {
             admin: [
                 { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                 { id: 'patients', label: 'Patients', icon: 'users' },
+                { id: 'appointment-requests', label: 'Appointment Requests', icon: 'clipboard' },
+                { id: 'refill-requests', label: 'Refill Requests', icon: 'pills' },
                 { id: 'appointments', label: 'Appointments', icon: 'calendar' },
                 { id: 'visits', label: 'Clinical Visits', icon: 'clipboard' },
                 { id: 'inventory', label: 'Inventory', icon: 'package' },
@@ -206,6 +208,8 @@ const Auth = {
             case_manager: [
                 { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                 { id: 'patients', label: 'Patients', icon: 'users' },
+                { id: 'appointment-requests', label: 'Appointment Requests', icon: 'clipboard' },
+                { id: 'refill-requests', label: 'Refill Requests', icon: 'pills' },
                 { id: 'appointments', label: 'Appointments', icon: 'calendar' },
                 { id: 'counseling', label: 'Counseling', icon: 'message-circle' },
                 { id: 'referrals', label: 'Referrals', icon: 'share' },
@@ -226,9 +230,9 @@ const Auth = {
                 { id: 'dashboard', label: 'My Dashboard', icon: 'home' },
                 { id: 'profile', label: 'My Profile', icon: 'user' },
                 { id: 'appointments', label: 'Appointments', icon: 'calendar' },
+                { id: 'my-medications', label: 'My Medications', icon: 'pills' },
                 { id: 'vaccinations', label: 'My Vaccinations', icon: 'syringe' },
                 { id: 'prescriptions', label: 'Prescriptions', icon: 'file-text' },
-                { id: 'reminders', label: 'Medication Reminders', icon: 'bell' },
                 { id: 'lab-results', label: 'Lab Results', icon: 'activity' },
                 { id: 'surveys', label: 'Feedback', icon: 'star' },
                 { id: 'audit', label: 'My Activity Log', icon: 'shield' },

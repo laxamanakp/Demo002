@@ -184,18 +184,45 @@ const LabTests = {
         return results.map(result => {
             const patient = patients.find(p => p.id === result.patient_id);
             
+            // Get risk interpretation from ARPA
+            let riskBadge = '-';
+            let riskColor = '#6b7280';
+            let valueStyle = '';
+            
+            if (typeof ARPA !== 'undefined') {
+                const interpretation = ARPA.getLabInterpretation(result.test_name, result.result_value);
+                riskColor = interpretation.color;
+                
+                // Style the value based on risk level
+                if (interpretation.level === 'severe' || interpretation.level === 'high' || interpretation.level === 'tb_resistant' || interpretation.level === 'high_resistance') {
+                    valueStyle = `color: ${riskColor}; font-weight: bold;`;
+                    riskBadge = `<span class="badge" style="background: ${riskColor}; color: white;">⚠️ ${interpretation.label}</span>`;
+                } else if (interpretation.level === 'moderate' || interpretation.level === 'tb_sensitive' || interpretation.level === 'resistance' || interpretation.level === 'positive') {
+                    valueStyle = `color: ${riskColor}; font-weight: 600;`;
+                    riskBadge = `<span class="badge" style="background: ${riskColor}; color: white;">${interpretation.label}</span>`;
+                } else if (interpretation.level === 'mild' || interpretation.level === 'low' || interpretation.level === 'borderline' || interpretation.level === 'prediabetes') {
+                    valueStyle = `color: ${riskColor};`;
+                    riskBadge = `<span class="badge" style="background: ${riskColor}; color: white;">${interpretation.label}</span>`;
+                } else if (interpretation.level === 'normal' || interpretation.level === 'optimal') {
+                    valueStyle = `color: ${riskColor};`;
+                    riskBadge = `<span class="badge" style="background: ${riskColor}; color: white;">✓ ${interpretation.label}</span>`;
+                } else {
+                    riskBadge = `<span class="badge badge-secondary">${interpretation.label || 'Unknown'}</span>`;
+                }
+            }
+            
             return `
                 <tr>
                     <td>${new Date(result.reported_at).toLocaleDateString()}</td>
                     <td>${patient ? patient.firstName + ' ' + patient.lastName : 'N/A'}</td>
                     <td><strong>${result.test_name}</strong></td>
-                    <td>${result.result_value}</td>
+                    <td style="${valueStyle}">${result.result_value}</td>
                     <td>${result.unit || '-'}</td>
                     <td>${result.reference_range_text || (result.reference_range_min && result.reference_range_max ? `${result.reference_range_min}-${result.reference_range_max}` : '-')}</td>
-                    <td>${result.is_critical ? '<span class="badge badge-danger">Critical</span>' : '-'}</td>
+                    <td>${riskBadge}</td>
                     <td>
                         <button class="btn btn-sm btn-outline" onclick="LabTests.viewResult('${result.result_id}')">View</button>
-                        <button class="btn btn-sm btn-outline" onclick="LabTests.uploadFile('${result.result_id}')">Upload File</button>
+                        <button class="btn btn-sm btn-outline" onclick="LabTests.uploadFile('${result.result_id}')">Upload</button>
                     </td>
                 </tr>
             `;
@@ -269,15 +296,36 @@ const LabTests = {
                     <label class="required">Test Panel</label>
                     <select id="testPanel" required>
                         <option value="">Select Test</option>
-                        <option value="CD4 Count">CD4 Count</option>
-                        <option value="Viral Load">Viral Load</option>
-                        <option value="CBC">Complete Blood Count (CBC)</option>
-                        <option value="Liver Function">Liver Function Tests</option>
-                        <option value="Kidney Function">Kidney Function Tests</option>
-                        <option value="Lipid Panel">Lipid Panel</option>
-                        <option value="Hepatitis B">Hepatitis B</option>
-                        <option value="Hepatitis C">Hepatitis C</option>
-                        <option value="Syphilis">Syphilis</option>
+                        <optgroup label="HIV Monitoring">
+                            <option value="Viral Load">Viral Load (HIV RNA)</option>
+                            <option value="CD4 Count">CD4 Count</option>
+                            <option value="HIVDR">HIV Drug Resistance (Genotype)</option>
+                        </optgroup>
+                        <optgroup label="TB Screening">
+                            <option value="GeneXpert">GeneXpert MTB/RIF</option>
+                            <option value="Chest X-Ray">Chest X-Ray (CXR)</option>
+                        </optgroup>
+                        <optgroup label="Liver Function">
+                            <option value="ALT">ALT (SGPT)</option>
+                            <option value="AST">AST (SGOT)</option>
+                            <option value="HBsAg">HBsAg (Hepatitis B)</option>
+                            <option value="Anti-HCV">Anti-HCV (Hepatitis C)</option>
+                        </optgroup>
+                        <optgroup label="Kidney Function">
+                            <option value="Creatinine">Creatinine</option>
+                        </optgroup>
+                        <optgroup label="Hematology">
+                            <option value="Hemoglobin">Hemoglobin</option>
+                            <option value="Platelet Count">Platelet Count</option>
+                            <option value="CBC">Complete Blood Count (CBC)</option>
+                        </optgroup>
+                        <optgroup label="Metabolic Panel">
+                            <option value="Blood Glucose">Blood Glucose (Fasting)</option>
+                            <option value="Cholesterol">Total Cholesterol</option>
+                        </optgroup>
+                        <optgroup label="STI Screening">
+                            <option value="RPR">RPR/VDRL (Syphilis)</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="form-row">
@@ -526,7 +574,52 @@ const LabTests = {
         const patients = JSON.parse(localStorage.getItem('patients')) || [];
         const patient = patients.find(p => p.id === result.patient_id);
 
+        // Get ARPA interpretation
+        let interpretationSection = '';
+        if (typeof ARPA !== 'undefined') {
+            const interpretation = ARPA.getLabInterpretation(result.test_name, result.result_value);
+            interpretationSection = `
+                <div class="card mb-3" style="border-left: 4px solid ${interpretation.color};">
+                    <div class="card-header" style="background: ${interpretation.color}15;">
+                        <h4 style="margin: 0; color: ${interpretation.color};">📊 Clinical Interpretation</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-between align-center mb-2">
+                            <span><strong>Risk Level:</strong></span>
+                            <span class="badge" style="background: ${interpretation.color}; color: white; font-size: 14px; padding: 6px 12px;">
+                                ${interpretation.label}
+                            </span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Reference Range:</strong><br>
+                            <span class="text-muted">${interpretation.rangeText || 'Not specified'}</span>
+                        </div>
+                        ${interpretation.riskScore > 0 ? `
+                            <div class="mb-2">
+                                <strong>ARPA Risk Score Contribution:</strong> 
+                                <span style="color: ${interpretation.color}; font-weight: bold;">${interpretation.riskScore}/100</span>
+                            </div>
+                        ` : ''}
+                        ${interpretation.systemAction ? `
+                            <div class="mb-2" style="background: #fef3c7; padding: 10px; border-radius: 6px;">
+                                <strong>⚡ System Action:</strong><br>
+                                <span>${interpretation.systemAction}</span>
+                            </div>
+                        ` : ''}
+                        ${interpretation.clinicalNote ? `
+                            <div class="mt-2" style="background: #eff6ff; padding: 10px; border-radius: 6px;">
+                                <strong>📋 Clinical Note:</strong><br>
+                                <span>${interpretation.clinicalNote}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
         const content = `
+            ${interpretationSection}
+
             <div class="form-group">
                 <label>Patient</label>
                 <input type="text" value="${patient ? patient.firstName + ' ' + patient.lastName : 'N/A'}" readonly>
@@ -538,26 +631,28 @@ const LabTests = {
                 </div>
                 <div class="form-group">
                     <label>Test Code</label>
-                    <input type="text" value="${result.test_code}" readonly>
+                    <input type="text" value="${result.test_code || '-'}" readonly>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Result Value</label>
-                    <input type="text" value="${result.result_value}" readonly>
+                    <input type="text" value="${result.result_value}" readonly style="font-weight: bold; font-size: 1.1em;">
                 </div>
                 <div class="form-group">
                     <label>Unit</label>
                     <input type="text" value="${result.unit || '-'}" readonly>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Reference Range</label>
-                <input type="text" value="${result.reference_range_text || (result.reference_range_min && result.reference_range_max ? `${result.reference_range_min}-${result.reference_range_max}` : '-')}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Critical Value</label>
-                <input type="text" value="${result.is_critical ? 'Yes' : 'No'}" readonly>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Collected Date</label>
+                    <input type="text" value="${result.collected_at ? new Date(result.collected_at).toLocaleDateString() : '-'}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Reported Date</label>
+                    <input type="text" value="${result.reported_at ? new Date(result.reported_at).toLocaleDateString() : '-'}" readonly>
+                </div>
             </div>
             ${result.notes ? `
                 <div class="form-group">

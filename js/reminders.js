@@ -3,8 +3,10 @@
 // ============================================================
 
 const Reminders = {
-    // Load reminders page
-    loadRemindersPage(container) {
+    currentTab: 'reminders',
+
+    // Load unified medications page (Reminders + Refills)
+    loadMedicationsPage(container) {
         const role = Auth.getCurrentUser().role;
         const currentUser = Auth.getCurrentUser();
         
@@ -16,26 +18,39 @@ const Reminders = {
         let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
         reminders = reminders.filter(r => r.patientId === currentUser.patientId);
 
+        // Get refill requests for this patient
+        const patientId = currentUser.patientId || currentUser.userId;
+        const refillRequests = (JSON.parse(localStorage.getItem('refill_requests')) || [])
+            .filter(r => r.patient_id === patientId);
+        const pendingRefills = refillRequests.filter(r => r.status === 'pending').length;
+        const readyRefills = refillRequests.filter(r => ['approved', 'ready'].includes(r.status)).length;
+
         let html = `
             <div class="patient-list-header">
                 <div>
-                    <h2>Medication Reminders</h2>
-                    <p>Manage your medication schedule and adherence</p>
+                    <h2>💊 My Medications</h2>
+                    <p>Manage your medication reminders and refill requests</p>
                 </div>
-                <button class="btn btn-primary" onclick="Reminders.showAddReminderModal()">
-                    Add Reminder
-                </button>
             </div>
 
-            ${this.renderAdherenceCard(reminders)}
+            ${this.renderMedicationStats(reminders, refillRequests)}
 
             <div class="card mt-3">
                 <div class="card-header">
-                    <h3 class="card-title">Today's Medications</h3>
+                    <div class="tabs">
+                        <button class="tab-btn ${this.currentTab === 'reminders' ? 'active' : ''}" onclick="Reminders.switchTab('reminders')">
+                            🔔 Reminders
+                        </button>
+                        <button class="tab-btn ${this.currentTab === 'refills' ? 'active' : ''}" onclick="Reminders.switchTab('refills')">
+                            📦 Refill Requests
+                            ${pendingRefills > 0 ? `<span class="badge badge-warning" style="margin-left: 5px;">${pendingRefills}</span>` : ''}
+                            ${readyRefills > 0 ? `<span class="badge badge-success" style="margin-left: 5px;">${readyRefills} ready</span>` : ''}
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="reminder-list">
-                        ${this.renderReminderList(reminders)}
+                    <div id="medicationsTabContent">
+                        ${this.currentTab === 'reminders' ? this.renderRemindersTab(reminders) : this.renderRefillsTab(refillRequests)}
                     </div>
                 </div>
             </div>
@@ -45,6 +60,236 @@ const Reminders = {
 
         // Start reminder check
         this.startReminderCheck();
+    },
+
+    // Switch between tabs
+    switchTab(tab) {
+        this.currentTab = tab;
+        const currentUser = Auth.getCurrentUser();
+        const patientId = currentUser.patientId || currentUser.userId;
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        // Update content
+        const contentArea = document.getElementById('medicationsTabContent');
+        if (tab === 'reminders') {
+            let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+            reminders = reminders.filter(r => r.patientId === currentUser.patientId);
+            contentArea.innerHTML = this.renderRemindersTab(reminders);
+        } else {
+            const refillRequests = (JSON.parse(localStorage.getItem('refill_requests')) || [])
+                .filter(r => r.patient_id === patientId);
+            contentArea.innerHTML = this.renderRefillsTab(refillRequests);
+        }
+    },
+
+    // Render medication statistics
+    renderMedicationStats(reminders, refillRequests) {
+        const activeReminders = reminders.filter(r => r.active);
+        const totalDoses = activeReminders.length * 30;
+        const missedDoses = activeReminders.reduce((sum, r) => sum + (r.missedDoses || 0), 0);
+        const adherenceRate = totalDoses > 0 ? Math.round(((totalDoses - missedDoses) / totalDoses) * 100) : 100;
+
+        let adherenceClass = 'success';
+        if (adherenceRate < 95) adherenceClass = 'warning';
+        if (adherenceRate < 80) adherenceClass = 'danger';
+
+        const pendingRefills = refillRequests.filter(r => r.status === 'pending').length;
+        const readyRefills = refillRequests.filter(r => ['approved', 'ready'].includes(r.status)).length;
+
+        return `
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-value">${activeReminders.length}</div>
+                            <div class="stat-label">Active Reminders</div>
+                        </div>
+                        <div class="stat-card-icon primary">🔔</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-value">${adherenceRate}%</div>
+                            <div class="stat-label">Adherence Rate</div>
+                        </div>
+                        <div class="stat-card-icon ${adherenceClass}">✓</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-value">${pendingRefills}</div>
+                            <div class="stat-label">Pending Refills</div>
+                        </div>
+                        <div class="stat-card-icon warning">⏳</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-value">${readyRefills}</div>
+                            <div class="stat-label">Ready for Pickup</div>
+                        </div>
+                        <div class="stat-card-icon success">📦</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // Render reminders tab content
+    renderRemindersTab(reminders) {
+        return `
+            <div class="d-flex justify-between align-center mb-3">
+                <h3 style="margin: 0;">Today's Medications</h3>
+                <button class="btn btn-primary" onclick="Reminders.showAddReminderModal()">
+                    ➕ Add Reminder
+                </button>
+            </div>
+            <div class="reminder-list">
+                ${this.renderReminderList(reminders)}
+            </div>
+        `;
+    },
+
+    // Render refills tab content
+    renderRefillsTab(refillRequests) {
+        const facilities = JSON.parse(localStorage.getItem('facilities')) || [];
+
+        let html = `
+            <div class="d-flex justify-between align-center mb-3">
+                <h3 style="margin: 0;">My Refill Requests</h3>
+                <button class="btn btn-primary" onclick="RefillRequests.showRequestModal()">
+                    ➕ Request Refill
+                </button>
+            </div>
+        `;
+
+        if (refillRequests.length === 0) {
+            html += '<p class="text-muted text-center py-4">No refill requests yet. Click "Request Refill" to get started.</p>';
+            return html;
+        }
+
+        // Group by status
+        const statusOrder = ['ready', 'approved', 'pending', 'dispensed', 'declined', 'cancelled'];
+        const sortedRequests = [...refillRequests].sort((a, b) => {
+            const orderA = statusOrder.indexOf(a.status);
+            const orderB = statusOrder.indexOf(b.status);
+            if (orderA !== orderB) return orderA - orderB;
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        html += sortedRequests.map(req => {
+            const facility = facilities.find(f => f.id === req.pickup_facility_id);
+            let statusBadge = '';
+            let statusMessage = '';
+            let actionButtons = '';
+
+            switch (req.status) {
+                case 'pending':
+                    statusBadge = '<span class="badge badge-warning">⏳ Pending Review</span>';
+                    statusMessage = '<p class="text-warning mt-2" style="font-size: 0.9rem;">Waiting for Case Manager approval...</p>';
+                    actionButtons = `
+                        <button class="btn btn-sm btn-outline" onclick="Reminders.cancelRefillRequest('${req.request_id}')">
+                            Cancel
+                        </button>
+                    `;
+                    break;
+                case 'approved':
+                case 'ready':
+                    statusBadge = '<span class="badge badge-success">✅ Ready for Pickup</span>';
+                    statusMessage = `
+                        <div class="mt-2 p-2" style="background: var(--success-light, #d1fae5); border-radius: var(--border-radius-sm);">
+                            <p style="margin: 0; color: var(--success-color, #059669);">
+                                <strong>📅 Pickup Date:</strong> ${new Date(req.ready_for_pickup_date || req.preferred_pickup_date).toLocaleDateString()}<br>
+                                <strong>🏥 Location:</strong> ${facility ? facility.name : 'N/A'}
+                            </p>
+                            ${req.review_notes ? `<p style="margin: 5px 0 0 0; font-style: italic; color: var(--text-muted);">"${req.review_notes}"</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                case 'dispensed':
+                    statusBadge = '<span class="badge badge-secondary">✓ Dispensed</span>';
+                    statusMessage = `<p class="text-muted mt-2" style="font-size: 0.9rem;">Picked up on ${new Date(req.dispensed_at).toLocaleDateString()}</p>`;
+                    break;
+                case 'declined':
+                    statusBadge = '<span class="badge badge-danger">❌ Declined</span>';
+                    statusMessage = `
+                        <div class="mt-2 p-2" style="background: var(--danger-light, #fee2e2); border-radius: var(--border-radius-sm);">
+                            <p style="margin: 0; color: var(--danger-color, #dc2626);">
+                                <strong>Reason:</strong> ${req.decline_reason || 'Not specified'}
+                            </p>
+                        </div>
+                    `;
+                    break;
+                case 'cancelled':
+                    statusBadge = '<span class="badge badge-secondary">⚪ Cancelled</span>';
+                    break;
+            }
+
+            return `
+                <div class="patient-card mb-2" style="border-left: 4px solid ${this.getStatusColor(req.status)};">
+                    <div class="patient-info">
+                        <div>
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <strong>💊 ${req.medication_name}</strong>
+                                ${statusBadge}
+                            </div>
+                            <div class="patient-meta">
+                                <span>📦 ${req.quantity_requested} ${req.unit || 'tablets'}</span>
+                                <span>📅 Requested: ${new Date(req.preferred_pickup_date).toLocaleDateString()}</span>
+                            </div>
+                            ${statusMessage}
+                            <p class="text-muted mt-1" style="font-size: 0.8rem;">
+                                Submitted: ${new Date(req.created_at).toLocaleString()}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="patient-actions">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return html;
+    },
+
+    // Get status color
+    getStatusColor(status) {
+        const colors = {
+            pending: '#f59e0b',
+            approved: '#10b981',
+            ready: '#10b981',
+            dispensed: '#6b7280',
+            declined: '#ef4444',
+            cancelled: '#9ca3af'
+        };
+        return colors[status] || '#6b7280';
+    },
+
+    // Cancel refill request from patient view
+    cancelRefillRequest(requestId) {
+        if (typeof RefillRequests !== 'undefined') {
+            RefillRequests.cancelRequest(requestId);
+            // Reload the page to reflect changes
+            setTimeout(() => {
+                this.loadMedicationsPage(document.getElementById('contentArea'));
+            }, 500);
+        }
+    },
+
+    // Legacy load reminders page (redirects to combined page)
+    loadRemindersPage(container) {
+        this.currentTab = 'reminders';
+        this.loadMedicationsPage(container);
     },
 
     // Render adherence card
