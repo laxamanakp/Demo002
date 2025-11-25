@@ -202,6 +202,9 @@ const App = {
             case 'refill-requests':
                 if (typeof RefillRequests !== 'undefined') RefillRequests.loadRequestsPage(contentArea);
                 break;
+            case 'doctor-availability':
+                if (typeof DoctorAvailability !== 'undefined') DoctorAvailability.loadDoctorAvailabilityPage(contentArea);
+                break;
             case 'reporting':
                 if (typeof Reporting !== 'undefined') Reporting.loadReportingPage(contentArea);
                 break;
@@ -245,7 +248,8 @@ const App = {
             counseling: 'Counseling Sessions',
             surveys: 'Satisfaction Surveys',
             vaccinations: 'Vaccination Program',
-            audit: 'Audit Trail'
+            audit: 'Audit Trail',
+            'doctor-availability': 'Doctor Availability Management'
         };
         return titles[page] || 'My Hub Cares';
     },

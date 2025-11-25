@@ -107,7 +107,7 @@ const RefillRequests = {
 
     // ========== RENDER FUNCTIONS ==========
 
-    // Render requests list for Case Manager
+    // Render requests list for Treatment Partner (Case Manager)
     renderRequestsList(requests) {
         if (requests.length === 0) {
             return '<p class="text-muted text-center py-4">No refill requests found.</p>';
@@ -117,7 +117,10 @@ const RefillRequests = {
         const facilities = JSON.parse(localStorage.getItem('facilities')) || [];
         const prescriptions = JSON.parse(localStorage.getItem('prescriptions')) || [];
 
-        return requests.map(req => {
+        // Sort: newest on top (per requirements)
+        const sortedRequests = [...requests].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        return sortedRequests.map(req => {
             const patient = patients.find(p => p.id === req.patient_id);
             const facility = facilities.find(f => f.id === req.pickup_facility_id);
             const prescription = prescriptions.find(p => p.id === req.prescription_id);
@@ -146,25 +149,61 @@ const RefillRequests = {
                 `;
             }
 
+            // Pill status badge
+            let pillStatusBadge = '';
+            if (req.pill_status) {
+                const pillStatusColors = {
+                    'kulang': 'danger',
+                    'sakto': 'success',
+                    'sobra': 'warning'
+                };
+                const pillStatusLabels = {
+                    'kulang': '📉 KULANG',
+                    'sakto': '✅ SAKTO',
+                    'sobra': '📈 SOBRA'
+                };
+                pillStatusBadge = `<span class="badge badge-${pillStatusColors[req.pill_status] || 'secondary'}">${pillStatusLabels[req.pill_status] || req.pill_status}</span>`;
+            }
+
+            // Eligibility badge
+            let eligibilityBadge = '';
+            if (req.remaining_pill_count !== undefined) {
+                if (req.is_eligible_for_refill) {
+                    eligibilityBadge = '<span class="badge badge-success">✅ Eligible (≤10 pills)</span>';
+                } else {
+                    eligibilityBadge = '<span class="badge badge-warning">⚠️ Early Request</span>';
+                }
+            }
+
             return `
-                <div class="patient-card request-card" data-status="${req.status}" data-patient="${patient ? (patient.firstName + ' ' + patient.lastName).toLowerCase() : ''}">
+                <div class="patient-card request-card" data-status="${req.status}" data-patient="${patient ? (patient.firstName + ' ' + patient.lastName).toLowerCase() : ''}" style="${req.pill_status === 'kulang' ? 'border-left: 4px solid var(--danger-color);' : ''}">
                     <div class="patient-info">
                         <div>
                             <div class="d-flex align-center gap-2 mb-1">
                                 <h3>${patient ? patient.firstName + ' ' + patient.lastName : 'Unknown Patient'}</h3>
                                 ${statusBadge}
+                                ${pillStatusBadge}
                             </div>
                             <div class="patient-meta">
                                 <span>💊 ${req.medication_name}</span>
                                 <span>📦 ${req.quantity_requested} ${req.unit || 'tablets'}</span>
                             </div>
                             <div class="patient-meta mt-1">
-                                <span>📅 Pickup: ${new Date(req.preferred_pickup_date).toLocaleDateString()}</span>
+                                <span>📅 Pickup: ${new Date(req.preferred_pickup_date).toLocaleDateString()}${req.preferred_pickup_time ? ' @ ' + req.preferred_pickup_time : ''}</span>
                                 <span>🏥 ${facility ? facility.name : 'N/A'}</span>
                             </div>
                             
                             <div class="mt-2 p-2" style="background: var(--bg-secondary); border-radius: var(--border-radius-sm);">
-                                <strong>📊 Patient Info:</strong>
+                                <strong>📊 Pill Count & Eligibility:</strong>
+                                <div class="patient-meta mt-1">
+                                    <span>🔢 Remaining: <strong>${req.remaining_pill_count !== undefined ? req.remaining_pill_count + ' pills' : 'Not reported'}</strong></span>
+                                    ${eligibilityBadge}
+                                </div>
+                                ${req.pill_status === 'kulang' && req.kulang_explanation ? `
+                                    <div class="mt-1" style="color: var(--danger-color);">
+                                        <strong>⚠️ Kulang Reason:</strong> ${req.kulang_explanation}
+                                    </div>
+                                ` : ''}
                                 <div class="patient-meta mt-1">
                                     <span>Last Pickup: ${lastPickup}</span>
                                     <span>Adherence: ${adherenceInfo.rate}% ${adherenceInfo.rate >= 80 ? '✓' : '⚠️'}</span>
@@ -202,8 +241,24 @@ const RefillRequests = {
             let statusMessage = '';
             let cancelButton = '';
 
+            // Pill status info
+            let pillStatusInfo = '';
+            if (req.remaining_pill_count !== undefined) {
+                const pillStatusLabels = {
+                    'kulang': '📉 Insufficient',
+                    'sakto': '✅ Correct',
+                    'sobra': '📈 Excess'
+                };
+                pillStatusInfo = `
+                    <div class="patient-meta mt-1">
+                        <span>🔢 Reported: ${req.remaining_pill_count} pills remaining</span>
+                        <span>${pillStatusLabels[req.pill_status] || ''}</span>
+                    </div>
+                `;
+            }
+
             if (req.status === this.STATUS.PENDING) {
-                statusMessage = '<p class="text-warning mt-2">⏳ Waiting for Case Manager approval...</p>';
+                statusMessage = '<p class="text-warning mt-2">⏳ Waiting for Treatment Partner approval...</p>';
                 cancelButton = `
                     <button class="btn btn-sm btn-outline" onclick="RefillRequests.cancelRequest('${req.request_id}')">
                         Cancel Request
@@ -212,7 +267,7 @@ const RefillRequests = {
             } else if (req.status === this.STATUS.APPROVED || req.status === this.STATUS.READY) {
                 statusMessage = `
                     <p class="text-success mt-2">✅ Approved! Ready for pickup.</p>
-                    <p class="text-muted">📅 Pickup Date: ${new Date(req.ready_for_pickup_date || req.preferred_pickup_date).toLocaleDateString()}</p>
+                    <p class="text-muted">📅 Pickup: ${new Date(req.ready_for_pickup_date || req.preferred_pickup_date).toLocaleDateString()}${req.preferred_pickup_time ? ' @ ' + req.preferred_pickup_time : ''}</p>
                     <p class="text-muted">🏥 Location: ${facility ? facility.name : 'N/A'}</p>
                 `;
                 if (req.review_notes) {
@@ -237,8 +292,9 @@ const RefillRequests = {
                             </div>
                             <div class="patient-meta">
                                 <span>📦 ${req.quantity_requested} ${req.unit || 'tablets'}</span>
-                                <span>📅 Requested: ${new Date(req.preferred_pickup_date).toLocaleDateString()}</span>
+                                <span>📅 Requested: ${new Date(req.preferred_pickup_date).toLocaleDateString()}${req.preferred_pickup_time ? ' @ ' + req.preferred_pickup_time : ''}</span>
                             </div>
+                            ${pillStatusInfo}
                             ${statusMessage}
                         </div>
                     </div>
@@ -265,6 +321,16 @@ const RefillRequests = {
 
     // ========== MODAL FUNCTIONS ==========
 
+    // Pill status constants
+    PILL_STATUS: {
+        KULANG: 'kulang',      // Insufficient - less than expected
+        SAKTO: 'sakto',        // Just right - matches expected
+        SOBRA: 'sobra'         // Excess - more than expected
+    },
+
+    // Minimum pills for refill eligibility (per requirements: 10 pills or less)
+    MIN_PILLS_FOR_REFILL: 10,
+
     // Show refill request modal (for patients)
     showRequestModal() {
         const currentUser = Auth.getCurrentUser();
@@ -279,9 +345,18 @@ const RefillRequests = {
             return;
         }
 
+        // Get minimum booking date (tomorrow - no same-day per requirements)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const minDate = tomorrow.toISOString().split('T')[0];
+
         const content = `
             <form id="refillRequestForm">
                 <input type="hidden" id="refillPatientId" value="${patientId}">
+                
+                <div class="alert alert-info">
+                    ℹ️ <strong>Important:</strong> You can request a refill when you have <strong>10 pills or less</strong> remaining to ensure continuous medication intake.
+                </div>
                 
                 <div class="form-group">
                     <label class="required">Select Medication to Refill</label>
@@ -292,12 +367,46 @@ const RefillRequests = {
                                 <label for="med_${index}" style="cursor: pointer; margin: 0; flex: 1;">
                                     <strong>${med.name}</strong><br>
                                     <span class="text-muted">Dosage: ${med.dosage} ${med.frequency}</span><br>
-                                    <span class="text-muted">Last Pickup: ${med.lastPickup || 'N/A'}</span>
-                                    <span class="text-muted"> | Pills Remaining: ~${med.remaining || 'Unknown'}</span>
-                                    ${med.remaining && med.remaining <= 7 ? '<span class="badge badge-warning ml-2">⚠️ Running Low</span>' : ''}
+                                    <span class="text-muted">Daily Dose: ${med.pillsPerDay || 1} pill(s)/day</span>
+                                    ${med.remaining !== null && med.remaining <= 10 ? '<span class="badge badge-success ml-2">✅ Eligible for Refill</span>' : ''}
+                                    ${med.remaining !== null && med.remaining > 10 ? '<span class="badge badge-warning ml-2">⚠️ ' + med.remaining + ' pills remaining</span>' : ''}
                                 </label>
                             </div>
                         `).join('')}
+                    </div>
+                </div>
+
+                <div class="card mb-3" style="background: var(--bg-secondary);">
+                    <div class="card-body">
+                        <h4 class="mb-2">📊 Current Pill Count</h4>
+                        <div class="form-group mb-2">
+                            <label class="required">How many pills do you currently have remaining?</label>
+                            <input type="number" id="remainingPillCount" min="0" max="999" required 
+                                   placeholder="Enter your current pill count" 
+                                   onchange="RefillRequests.validatePillCount()" 
+                                   oninput="RefillRequests.validatePillCount()">
+                            <small class="text-muted">Be accurate - this helps ensure continuous medication supply</small>
+                        </div>
+                        <div id="pillStatusDisplay" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <div id="kulangExplanationSection" style="display: none;">
+                    <div class="form-group">
+                        <label class="required" style="color: var(--danger-color);">⚠️ Why are your pills insufficient (kulang)?</label>
+                        <select id="kulangReason" onchange="RefillRequests.toggleOtherKulangReason()">
+                            <option value="">Select a reason</option>
+                            <option value="missed_pickup">Missed previous pickup schedule</option>
+                            <option value="lost_pills">Some pills were lost</option>
+                            <option value="damaged_pills">Some pills were damaged</option>
+                            <option value="shared_medication">Shared medication with family member</option>
+                            <option value="dosage_changed">Doctor changed dosage</option>
+                            <option value="other">Other (please explain)</option>
+                        </select>
+                    </div>
+                    <div id="kulangOtherReasonGroup" class="form-group" style="display: none;">
+                        <label class="required">Please explain</label>
+                        <textarea id="kulangOtherReason" rows="2" placeholder="Explain why pills are insufficient..."></textarea>
                     </div>
                 </div>
 
@@ -312,8 +421,26 @@ const RefillRequests = {
                     </div>
                     <div class="form-group">
                         <label class="required">Preferred Pickup Date</label>
-                        <input type="date" id="refillPickupDate" required min="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="refillPickupDate" required min="${minDate}">
+                        <small class="text-muted">⚠️ Schedule in advance only</small>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Preferred Pickup Time (Hourly)</label>
+                    <select id="refillPickupTime" required>
+                        <option value="">Select Time</option>
+                        <option value="08:00">8:00 AM</option>
+                        <option value="09:00">9:00 AM</option>
+                        <option value="10:00">10:00 AM</option>
+                        <option value="11:00">11:00 AM</option>
+                        <option value="13:00">1:00 PM</option>
+                        <option value="14:00">2:00 PM</option>
+                        <option value="15:00">3:00 PM</option>
+                        <option value="16:00">4:00 PM</option>
+                        <option value="17:00">5:00 PM</option>
+                    </select>
+                    <small class="text-muted">Note: Refills do NOT involve doctor selection - processed by Treatment Partner</small>
                 </div>
 
                 <div class="form-group">
@@ -325,8 +452,12 @@ const RefillRequests = {
                 </div>
 
                 <div class="form-group">
-                    <label>Notes (Optional)</label>
-                    <textarea id="refillNotes" rows="3" placeholder="Any special requests or notes..."></textarea>
+                    <label>Additional Notes (Optional)</label>
+                    <textarea id="refillNotes" rows="2" placeholder="Any special requests or notes..."></textarea>
+                </div>
+
+                <div id="eligibilityWarning" class="alert alert-warning" style="display: none;">
+                    ⚠️ <strong>Note:</strong> You have more than 10 pills remaining. Refill requests are typically processed when you have 10 or fewer pills to ensure continuous intake without penalty.
                 </div>
             </form>
         `;
@@ -340,6 +471,77 @@ const RefillRequests = {
 
         // Store medications data for form submission
         this._tempMedications = medications;
+    },
+
+    // Validate pill count and show status (kulang/sakto/sobra)
+    validatePillCount() {
+        const remainingPills = parseInt(document.getElementById('remainingPillCount').value) || 0;
+        const selectedMedIndex = document.querySelector('input[name="selectedMed"]:checked')?.value;
+        const medication = this._tempMedications ? this._tempMedications[selectedMedIndex] : null;
+        
+        const pillStatusDisplay = document.getElementById('pillStatusDisplay');
+        const kulangSection = document.getElementById('kulangExplanationSection');
+        const eligibilityWarning = document.getElementById('eligibilityWarning');
+        
+        if (!pillStatusDisplay) return;
+        
+        // Calculate expected remaining based on last pickup and daily dose
+        const expectedRemaining = medication ? (medication.remaining || 0) : 0;
+        const pillsPerDay = medication ? (medication.pillsPerDay || 1) : 1;
+        
+        // Determine pill status
+        let status, statusClass, statusMessage;
+        const tolerance = pillsPerDay * 2; // 2 days tolerance
+        
+        if (remainingPills < expectedRemaining - tolerance) {
+            status = this.PILL_STATUS.KULANG;
+            statusClass = 'danger';
+            statusMessage = `<strong>📉 KULANG (Insufficient)</strong><br>
+                            You have fewer pills than expected. Expected: ~${expectedRemaining}, Actual: ${remainingPills}<br>
+                            <em>Please explain why below.</em>`;
+            if (kulangSection) kulangSection.style.display = 'block';
+        } else if (remainingPills > expectedRemaining + tolerance) {
+            status = this.PILL_STATUS.SOBRA;
+            statusClass = 'warning';
+            statusMessage = `<strong>📈 SOBRA (Excess)</strong><br>
+                            You have more pills than expected. This may indicate missed doses.<br>
+                            Please ensure you're taking medication as prescribed.`;
+            if (kulangSection) kulangSection.style.display = 'none';
+        } else {
+            status = this.PILL_STATUS.SAKTO;
+            statusClass = 'success';
+            statusMessage = `<strong>✅ SAKTO (Just Right)</strong><br>
+                            Your pill count matches the expected amount. Good adherence!`;
+            if (kulangSection) kulangSection.style.display = 'none';
+        }
+
+        // Show pill status
+        pillStatusDisplay.style.display = 'block';
+        pillStatusDisplay.innerHTML = `<div class="alert alert-${statusClass}">${statusMessage}</div>`;
+        
+        // Store status for submission
+        this._currentPillStatus = status;
+        
+        // Show eligibility warning if more than 10 pills
+        if (eligibilityWarning) {
+            if (remainingPills > this.MIN_PILLS_FOR_REFILL) {
+                eligibilityWarning.style.display = 'block';
+            } else {
+                eligibilityWarning.style.display = 'none';
+            }
+        }
+        
+        // Check eligibility (10 pills or less)
+        return remainingPills <= this.MIN_PILLS_FOR_REFILL;
+    },
+
+    // Toggle other kulang reason field
+    toggleOtherKulangReason() {
+        const reason = document.getElementById('kulangReason').value;
+        const otherGroup = document.getElementById('kulangOtherReasonGroup');
+        if (otherGroup) {
+            otherGroup.style.display = reason === 'other' ? 'block' : 'none';
+        }
     },
 
     // Select medication helper
@@ -359,6 +561,16 @@ const RefillRequests = {
         prescriptions.filter(p => p.patientId === patientId).forEach(rx => {
             if (rx.drugs && rx.drugs.length > 0) {
                 rx.drugs.forEach(drug => {
+                    // Calculate pills per day from frequency
+                    let pillsPerDay = 1;
+                    if (drug.frequency) {
+                        if (drug.frequency.toLowerCase().includes('twice') || drug.frequency.toLowerCase().includes('bid') || drug.frequency.includes('2x')) {
+                            pillsPerDay = 2;
+                        } else if (drug.frequency.toLowerCase().includes('three') || drug.frequency.toLowerCase().includes('tid') || drug.frequency.includes('3x')) {
+                            pillsPerDay = 3;
+                        }
+                    }
+                    
                     medications.push({
                         prescriptionId: rx.id,
                         name: drug.drugName,
@@ -366,6 +578,7 @@ const RefillRequests = {
                         frequency: drug.frequency,
                         lastPickup: rx.prescriptionDate,
                         remaining: this.calculateRemainingPills(rx, drug),
+                        pillsPerDay: pillsPerDay,
                         unit: 'tablets'
                     });
                 });
@@ -385,6 +598,7 @@ const RefillRequests = {
                             frequency: `${drug.pillsPerDay} pill(s)/day`,
                             lastPickup: regimen.startDate,
                             remaining: drug.pillsRemaining || 0,
+                            pillsPerDay: drug.pillsPerDay || 1,
                             unit: 'tablets'
                         });
                     }
@@ -401,6 +615,7 @@ const RefillRequests = {
                     frequency: rem.frequency,
                     lastPickup: rem.lastTaken,
                     remaining: 10, // Estimate
+                    pillsPerDay: 1,
                     unit: 'tablets'
                 });
             });
@@ -414,6 +629,7 @@ const RefillRequests = {
                 frequency: 'Once daily',
                 lastPickup: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 remaining: 5,
+                pillsPerDay: 1,
                 unit: 'tablets'
             });
         }
@@ -448,8 +664,49 @@ const RefillRequests = {
         const medication = this._tempMedications[selectedMedIndex];
         const quantity = parseInt(document.getElementById('refillQuantity').value);
         const pickupDate = document.getElementById('refillPickupDate').value;
+        const pickupTime = document.getElementById('refillPickupTime').value;
         const facilityId = parseInt(document.getElementById('refillFacilityId').value);
         const notes = document.getElementById('refillNotes').value;
+        const remainingPills = parseInt(document.getElementById('remainingPillCount').value) || 0;
+        
+        // Get pill status and kulang explanation if applicable
+        const pillStatus = this._currentPillStatus || this.PILL_STATUS.SAKTO;
+        let kulangExplanation = null;
+        
+        if (pillStatus === this.PILL_STATUS.KULANG) {
+            const kulangReason = document.getElementById('kulangReason').value;
+            if (!kulangReason) {
+                App.showError('Please explain why your pills are insufficient (kulang)');
+                return;
+            }
+            if (kulangReason === 'other') {
+                const otherReason = document.getElementById('kulangOtherReason').value;
+                if (!otherReason.trim()) {
+                    App.showError('Please provide an explanation for insufficient pills');
+                    return;
+                }
+                kulangExplanation = otherReason;
+            } else {
+                const reasonLabels = {
+                    'missed_pickup': 'Missed previous pickup schedule',
+                    'lost_pills': 'Some pills were lost',
+                    'damaged_pills': 'Some pills were damaged',
+                    'shared_medication': 'Shared medication with family member',
+                    'dosage_changed': 'Doctor changed dosage'
+                };
+                kulangExplanation = reasonLabels[kulangReason] || kulangReason;
+            }
+        }
+
+        // Check refill eligibility (10 pills or less per requirements)
+        const isEligible = remainingPills <= this.MIN_PILLS_FOR_REFILL;
+        
+        // Warn if not eligible but allow submission with note
+        if (!isEligible) {
+            if (!confirm(`⚠️ You have ${remainingPills} pills remaining, which is more than the recommended 10 pills for refill eligibility.\n\nThis request will be flagged for review. The Treatment Partner may adjust the pickup date to ensure continuous intake.\n\nDo you want to proceed?`)) {
+                return;
+            }
+        }
 
         const newRequest = {
             request_id: 'refill_' + Date.now(),
@@ -460,8 +717,16 @@ const RefillRequests = {
             quantity_requested: quantity,
             unit: medication.unit || 'tablets',
             preferred_pickup_date: pickupDate,
+            preferred_pickup_time: pickupTime, // NEW: Added pickup time
             pickup_facility_id: facilityId,
             patient_notes: notes,
+            // NEW: Pill count tracking fields
+            remaining_pill_count: remainingPills,
+            pill_status: pillStatus, // kulang, sakto, or sobra
+            kulang_explanation: kulangExplanation,
+            is_eligible_for_refill: isEligible,
+            pills_per_day: medication.pillsPerDay || 1,
+            // Status fields
             status: this.STATUS.PENDING,
             reviewed_by: null,
             reviewed_at: null,
@@ -481,21 +746,32 @@ const RefillRequests = {
         requests.push(newRequest);
         localStorage.setItem('refill_requests', JSON.stringify(requests));
 
-        // Create notification for Case Managers
+        // Create notification for Treatment Partners (Case Managers)
         this.createNotification({
             type: 'new_refill_request',
             request_id: newRequest.request_id,
-            message: `New refill request for ${medication.name}`,
-            for_role: 'case_manager'
+            message: `New refill request for ${medication.name} (${remainingPills} pills remaining - ${pillStatus.toUpperCase()})`,
+            for_role: 'case_manager',
+            priority: pillStatus === this.PILL_STATUS.KULANG ? 'high' : 'normal'
         });
 
         // Log audit
         if (typeof logAudit === 'function') {
-            logAudit('create', 'refill_requests', 'Patient submitted refill request', newRequest.request_id);
+            logAudit('create', 'refill_requests', `Patient submitted refill request (${remainingPills} pills, ${pillStatus})`, newRequest.request_id);
         }
 
         App.closeModal();
-        App.showSuccess('✅ Refill request submitted successfully! A Case Manager will review your request shortly.');
+        
+        // Show appropriate success message
+        let successMsg = '✅ Refill request submitted successfully! A Treatment Partner will review your request shortly.';
+        if (!isEligible) {
+            successMsg += '\n\n⚠️ Note: Your request has been flagged since you have more than 10 pills remaining.';
+        }
+        if (pillStatus === this.PILL_STATUS.KULANG) {
+            successMsg += '\n\n📋 Your explanation for insufficient pills has been noted.';
+        }
+        
+        App.showSuccess(successMsg);
         
         // Reload appropriate page
         if (currentUser.role === 'patient') {
@@ -521,19 +797,51 @@ const RefillRequests = {
         const adherenceInfo = this.getPatientAdherenceInfo(request.patient_id);
         const lastPickup = this.getLastPickupDate(request.patient_id, request.medication_name);
 
+        // Pill status display
+        const pillStatusLabels = {
+            'kulang': '📉 KULANG (Insufficient)',
+            'sakto': '✅ SAKTO (Correct)',
+            'sobra': '📈 SOBRA (Excess)'
+        };
+        const pillStatusColors = {
+            'kulang': 'danger',
+            'sakto': 'success',
+            'sobra': 'warning'
+        };
+
+        // Minimum date for pickup (tomorrow)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const minDate = tomorrow.toISOString().split('T')[0];
+
         const content = `
             <div class="alert alert-info">
-                You are about to approve this refill request.
+                You are about to approve this refill request. No doctor selection needed - processed by Treatment Partner.
             </div>
             
             <div class="card mb-3">
                 <div class="card-body">
                     <p><strong>Patient:</strong> ${patient ? patient.firstName + ' ' + patient.lastName : 'N/A'}</p>
                     <p><strong>Medication:</strong> ${request.medication_name}</p>
-                    <p><strong>Quantity:</strong> ${request.quantity_requested} ${request.unit || 'tablets'}</p>
+                    <p><strong>Quantity Requested:</strong> ${request.quantity_requested} ${request.unit || 'tablets'}</p>
+                    <p><strong>Preferred Pickup:</strong> ${new Date(request.preferred_pickup_date).toLocaleDateString()}${request.preferred_pickup_time ? ' @ ' + request.preferred_pickup_time : ''}</p>
                     <p><strong>Pickup Location:</strong> ${facility ? facility.name : 'N/A'}</p>
                 </div>
             </div>
+
+            ${request.remaining_pill_count !== undefined ? `
+            <div class="card mb-3" style="background: var(--bg-secondary); border-left: 4px solid var(--${pillStatusColors[request.pill_status] || 'primary'}-color);">
+                <div class="card-body">
+                    <strong>📊 Pill Count Information:</strong>
+                    <ul class="mt-2" style="margin-left: 20px;">
+                        <li>Pills Remaining: <strong>${request.remaining_pill_count}</strong></li>
+                        <li>Status: <span class="badge badge-${pillStatusColors[request.pill_status] || 'secondary'}">${pillStatusLabels[request.pill_status] || request.pill_status}</span></li>
+                        <li>Refill Eligibility: ${request.is_eligible_for_refill ? '<span class="badge badge-success">✅ Eligible (≤10 pills)</span>' : '<span class="badge badge-warning">⚠️ Early Request (>' + this.MIN_PILLS_FOR_REFILL + ' pills)</span>'}</li>
+                        ${request.kulang_explanation ? `<li style="color: var(--danger-color);"><strong>Kulang Reason:</strong> ${request.kulang_explanation}</li>` : ''}
+                    </ul>
+                </div>
+            </div>
+            ` : ''}
 
             <div class="card mb-3" style="background: var(--bg-secondary);">
                 <div class="card-body">
@@ -553,8 +861,24 @@ const RefillRequests = {
                 </div>
                 <div class="form-group">
                     <label>Ready for Pickup Date</label>
-                    <input type="date" id="readyDate" value="${request.preferred_pickup_date}" min="${new Date().toISOString().split('T')[0]}">
+                    <input type="date" id="readyDate" value="${request.preferred_pickup_date}" min="${minDate}">
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label>Ready for Pickup Time</label>
+                <select id="readyTime">
+                    <option value="">Same as requested</option>
+                    <option value="08:00">8:00 AM</option>
+                    <option value="09:00">9:00 AM</option>
+                    <option value="10:00">10:00 AM</option>
+                    <option value="11:00">11:00 AM</option>
+                    <option value="13:00">1:00 PM</option>
+                    <option value="14:00">2:00 PM</option>
+                    <option value="15:00">3:00 PM</option>
+                    <option value="16:00">4:00 PM</option>
+                    <option value="17:00">5:00 PM</option>
+                </select>
             </div>
 
             <div class="form-group">
@@ -587,6 +911,7 @@ const RefillRequests = {
         const currentUser = Auth.getCurrentUser();
         const approvedQuantity = parseInt(document.getElementById('approvedQuantity').value);
         const readyDate = document.getElementById('readyDate').value;
+        const readyTime = document.getElementById('readyTime')?.value || null;
         const notes = document.getElementById('approvalNotes').value;
         const notifyPatient = document.getElementById('notifyPatient').checked;
 
@@ -609,6 +934,7 @@ const RefillRequests = {
             review_notes: notes,
             approved_quantity: approvedQuantity,
             ready_for_pickup_date: readyDate,
+            ready_for_pickup_time: readyTime || request.preferred_pickup_time,
             updated_at: new Date().toISOString()
         };
 
@@ -616,17 +942,18 @@ const RefillRequests = {
 
         // Send notification
         if (notifyPatient) {
+            const pickupTimeStr = readyTime || request.preferred_pickup_time;
             this.createNotification({
                 type: 'refill_approved',
                 request_id: requestId,
                 patient_id: request.patient_id,
-                message: `Your refill for ${request.medication_name} is ready for pickup on ${new Date(readyDate).toLocaleDateString()}!`
+                message: `Your refill for ${request.medication_name} is ready for pickup on ${new Date(readyDate).toLocaleDateString()}${pickupTimeStr ? ' at ' + pickupTimeStr : ''}!`
             });
         }
 
         // Log audit
         if (typeof logAudit === 'function') {
-            logAudit('update', 'refill_requests', 'Refill request approved', requestId);
+            logAudit('update', 'refill_requests', 'Refill request approved by Treatment Partner', requestId);
         }
 
         App.closeModal();

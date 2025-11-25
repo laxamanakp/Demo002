@@ -657,7 +657,7 @@ This document provides a comprehensive breakdown of the database structure per m
 | appointment_type | ENUM('follow_up', 'art_pickup', 'lab_test', 'counseling', 'general', 'initial') | NOT NULL | Yes | Appointment type |
 | scheduled_start | TIMESTAMPTZ | NOT NULL | Yes | Scheduled start time |
 | scheduled_end | TIMESTAMPTZ | NOT NULL | Yes | Scheduled end time |
-| duration_minutes | INTEGER | DEFAULT 30 | Yes | Appointment duration |
+| duration_minutes | INTEGER | DEFAULT 60 | Yes | Appointment duration (hourly only, no same-day booking) |
 | status | ENUM('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show') | DEFAULT 'scheduled' | Yes | Appointment status |
 | reason | TEXT | | No | Reason for visit |
 | notes | TEXT | | No | Appointment notes |
@@ -668,7 +668,17 @@ This document provides a comprehensive breakdown of the database structure per m
 | cancellation_reason | TEXT | | No | Cancellation reason |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Creation timestamp |
 
-**Indexes**: `idx_appointments_patient_id`, `idx_appointments_provider_id`, `idx_appointments_facility_id`, `idx_appointments_scheduled_start`, `idx_appointments_status`
+**Indexes**: `idx_appointments_patient_id`, `idx_appointments_provider_id`, `idx_appointments_facility_id`, `idx_appointments_scheduled_start`, `idx_appointments_scheduled_start_desc`, `idx_appointments_status`
+
+**Constraints:**
+- `CHECK (DATE(scheduled_start) >= CURRENT_DATE + INTERVAL '1 day')` - No same-day booking
+- `CHECK (EXTRACT(MINUTE FROM scheduled_start) = 0)` - Hourly intervals only
+- `CHECK (duration_minutes = 60)` - Enforce 60-minute slots
+
+**Notes:**
+- Appointments sorted: **newest on top, oldest at bottom**
+- No same-day booking enforced (minimum: tomorrow)
+- Only hourly time slots allowed (8:00, 9:00, 10:00, etc.)
 
 #### **6.2. availability_slots**
 | Column Name | Data Type | Constraints | Required | Description |
@@ -679,11 +689,17 @@ This document provides a comprehensive breakdown of the database structure per m
 | slot_date | DATE | NOT NULL | Yes | Slot date |
 | start_time | TIME | NOT NULL | Yes | Slot start time |
 | end_time | TIME | NOT NULL | Yes | Slot end time |
-| slot_status | ENUM('available', 'booked', 'blocked', 'unavailable') | DEFAULT 'available' | Yes | Slot status |
+| slot_status | ENUM('available', 'booked', 'blocked', 'unavailable', 'locked') | DEFAULT 'available' | Yes | Slot status |
 | appointment_id | UUID | FOREIGN KEY → appointments(appointment_id) | No | Booked appointment |
+| assignment_id | UUID | FOREIGN KEY → doctor_assignments(assignment_id) | No | **NEW** - Link to doctor assignment |
+| lock_status | BOOLEAN | DEFAULT false | Yes | **NEW** - Lock status (inherited from assignment) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Creation timestamp |
 
-**Indexes**: `idx_availability_slots_provider_id`, `idx_availability_slots_facility_id`, `idx_availability_slots_date`, `idx_availability_slots_status`
+**Indexes**: `idx_availability_slots_provider_id`, `idx_availability_slots_facility_id`, `idx_availability_slots_date`, `idx_availability_slots_status`, `idx_availability_slots_assignment_id`, `idx_availability_slots_lock_status`
+
+**Notes:**
+- Slots can be locked if parent `doctor_assignment.is_locked = true`
+- Locked slots cannot be booked or modified
 
 #### **6.3. appointment_reminders**
 | Column Name | Data Type | Constraints | Required | Description |
@@ -698,6 +714,87 @@ This document provides a comprehensive breakdown of the database structure per m
 
 **Indexes**: `idx_appointment_reminders_appointment_id`, `idx_appointment_reminders_status`, `idx_appointment_reminders_scheduled_at`
 
+#### **6.4. appointment_requests** ✨ **NEW**
+| Column Name | Data Type | Constraints | Required | Description |
+|------------|-----------|-------------|----------|-------------|
+| request_id | UUID | PRIMARY KEY | Yes | Unique request identifier |
+| patient_id | UUID | FOREIGN KEY → patients(patient_id), NOT NULL | Yes | Patient reference |
+| facility_id | UUID | FOREIGN KEY → facilities(facility_id), NOT NULL | Yes | Facility reference |
+| provider_id | UUID | FOREIGN KEY → users(user_id) | No | Requested provider (optional) |
+| requested_date | DATE | NOT NULL | Yes | Requested appointment date (future only) |
+| requested_time | TIME | NOT NULL | Yes | Requested time (hourly only, e.g., '09:00:00') |
+| appointment_type | ENUM('follow_up', 'art_pickup', 'lab_test', 'counseling', 'general', 'initial') | NOT NULL | Yes | Appointment type |
+| patient_notes | TEXT | | No | Patient's notes/reason |
+| status | ENUM('pending', 'approved', 'declined', 'cancelled') | DEFAULT 'pending' | Yes | Request status |
+| reviewed_by | UUID | FOREIGN KEY → users(user_id) | No | Case Manager who reviewed |
+| reviewed_at | TIMESTAMPTZ | | No | Review timestamp |
+| review_notes | TEXT | | No | Case Manager review notes |
+| decline_reason | TEXT | | No | Reason if declined |
+| appointment_id | UUID | FOREIGN KEY → appointments(appointment_id) | No | Created appointment (if approved) |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Request creation timestamp |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Last update timestamp |
+| created_by | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Patient who created request |
+
+**Indexes**: `idx_appointment_requests_patient_id`, `idx_appointment_requests_facility_id`, `idx_appointment_requests_provider_id`, `idx_appointment_requests_status`, `idx_appointment_requests_requested_date`, `idx_appointment_requests_reviewed_by`
+
+**Constraints:**
+- `CHECK (requested_date >= CURRENT_DATE + INTERVAL '1 day')` - No same-day booking
+- `CHECK (EXTRACT(MINUTE FROM requested_time) = 0)` - Hourly intervals only
+
+**Notes:**
+- Patients submit appointment requests (future dates only, hourly slots)
+- Case Manager (Treatment Partner) reviews and approves/declines
+- When approved, creates an `appointment` record
+
+#### **6.5. doctor_assignments** ✨ **NEW**
+| Column Name | Data Type | Constraints | Required | Description |
+|------------|-----------|-------------|----------|-------------|
+| assignment_id | UUID | PRIMARY KEY | Yes | Unique assignment identifier |
+| doctor_id | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Physician reference |
+| facility_id | UUID | FOREIGN KEY → facilities(facility_id), NOT NULL | Yes | Facility reference |
+| assignment_date | DATE | NOT NULL | Yes | Date of assignment |
+| start_time | TIME | NOT NULL | Yes | Start time (e.g., '08:00:00') |
+| end_time | TIME | NOT NULL | Yes | End time (e.g., '17:00:00') |
+| max_patients | INTEGER | DEFAULT 8 | Yes | Maximum patients for this assignment |
+| notes | TEXT | | No | Assignment notes |
+| is_locked | BOOLEAN | DEFAULT false | Yes | Lock status (prevents edits) |
+| locked_at | TIMESTAMPTZ | | No | When schedule was locked |
+| locked_by | UUID | FOREIGN KEY → users(user_id) | No | Admin who locked the schedule |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Creation timestamp |
+| created_by | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Admin who created assignment |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Last update timestamp |
+
+**Indexes**: `idx_doctor_assignments_doctor_id`, `idx_doctor_assignments_facility_id`, `idx_doctor_assignments_date`, `idx_doctor_assignments_is_locked`
+
+**Unique Constraint**: `UNIQUE(doctor_id, assignment_date)` - One assignment per doctor per day
+
+**Notes:**
+- Admin-only table (only admins can create/edit)
+- When `is_locked = true`, only admin can unlock
+- Used to generate `availability_slots` automatically
+
+#### **6.6. doctor_conflicts** ✨ **NEW**
+| Column Name | Data Type | Constraints | Required | Description |
+|------------|-----------|-------------|----------|-------------|
+| conflict_id | UUID | PRIMARY KEY | Yes | Unique conflict identifier |
+| doctor_id | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Physician reference |
+| facility_id | UUID | FOREIGN KEY → facilities(facility_id) | No | Facility (NULL if all facilities) |
+| conflict_date | DATE | NOT NULL | Yes | Date of conflict |
+| conflict_type | ENUM('leave', 'meeting', 'training', 'emergency', 'other') | NOT NULL | Yes | Type of conflict |
+| reason | TEXT | NOT NULL | Yes | Conflict reason/description |
+| start_time | TIME | | No | Start time (if partial day) |
+| end_time | TIME | | No | End time (if partial day) |
+| is_all_day | BOOLEAN | DEFAULT true | Yes | Full day conflict flag |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() | Yes | Creation timestamp |
+| created_by | UUID | FOREIGN KEY → users(user_id), NOT NULL | Yes | Admin who created conflict |
+
+**Indexes**: `idx_doctor_conflicts_doctor_id`, `idx_doctor_conflicts_date`, `idx_doctor_conflicts_type`
+
+**Notes:**
+- Conflicts prevent doctor assignment for that date
+- Can be full-day or partial-day conflicts
+- Admin-only management
+
 ### **Required Data**:
 - **Book Appointment**: patient_id, facility_id, appointment_type, scheduled_start, scheduled_end
 - **Check Availability**: provider_id, facility_id, slot_date, start_time → query `availability_slots` for available slots
@@ -709,15 +806,34 @@ This document provides a comprehensive breakdown of the database structure per m
    - Select facility → query `facilities` for facility details
    - Select provider → query `users` (D1) for provider availability
    - Check availability → query `availability_slots` (D6) for available slots matching provider/facility/date/time
+   - **Validate**: No same-day booking (date >= tomorrow), hourly intervals only
    - If available → create appointment → save to `appointments` (D6)
    - Update slot → set `availability_slots.slot_status = 'booked'`, `appointment_id = new_appointment_id`
    - Generate reminder → save to `appointment_reminders` (D6) scheduled for 24h before appointment
    - Log audit entry to `audit_log` (D8)
 
+2. **Patient Appointment Request (P6.1a)** ✨ **NEW**:
+   - Patient submits request → validate future date, hourly time → save to `appointment_requests` (D6)
+   - Case Manager reviews → query `appointment_requests` (D6) where `status = 'pending'`
+   - If approved → create `appointment` record → update `appointment_requests.appointment_id`
+   - If declined → update `appointment_requests.status = 'declined'`, set `decline_reason`
+   - Log audit entry to `audit_log` (D8)
+
+3. **Admin Doctor Availability Management (P6.5)** ✨ **NEW**:
+   - Admin assigns doctor → validate no conflicts → save to `doctor_assignments` (D6)
+   - System generates `availability_slots` automatically from assignments
+   - Admin can lock assignment → set `doctor_assignments.is_locked = true`
+   - Locked assignments cannot be edited (except by admin unlock)
+   - Admin adds conflicts → save to `doctor_conflicts` (D6) → blocks scheduling
+   - Log audit entry to `audit_log` (D8)
+
 2. **Check Availability (P6.2)**:
    - Query `availability_slots` (D6) filtered by provider_id, facility_id, slot_date, slot_status = 'available'
+   - Check `doctor_assignments` (D6) for assigned doctors
+   - Exclude slots with `doctor_conflicts` (D6) for same doctor/date
    - Exclude slots where `scheduled_start` conflicts with existing appointments
-   - Return available time slots
+   - Exclude locked slots (`lock_status = true`)
+   - Return available time slots (hourly only)
 
 3. **Send Reminders (P6.4)**:
    - Query `appointment_reminders` (D6) where `status = 'pending'` AND `reminder_scheduled_at <= NOW()`

@@ -289,7 +289,8 @@ const AppointmentRequests = {
                 <div class="form-row">
                     <div class="form-group">
                         <label class="required">Preferred Date</label>
-                        <input type="date" id="reqDate" required min="${new Date().toISOString().split('T')[0]}" onchange="AppointmentRequests.loadAvailableSlots()">
+                        <input type="date" id="reqDate" required min="${this.getMinBookingDate()}" onchange="AppointmentRequests.loadAvailableSlots()">
+                        <small class="text-muted">⚠️ Same-day booking is not allowed. Please select a future date.</small>
                     </div>
                     <div class="form-group">
                         <label class="required">Preferred Time</label>
@@ -379,18 +380,18 @@ const AppointmentRequests = {
         }
     },
 
-    // Generate time slots from availability
+    // Generate HOURLY time slots from availability (per requirement - hourly intervals only)
     generateTimeSlots(availableSlots) {
         const times = [];
         
         if (availableSlots.length === 0) {
-            // Default business hours if no slots defined
-            for (let hour = 9; hour <= 16; hour++) {
+            // Default business hours if no slots defined (HOURLY ONLY)
+            for (let hour = 8; hour <= 17; hour++) {
                 times.push(`${hour.toString().padStart(2, '0')}:00`);
-                if (hour < 16) times.push(`${hour.toString().padStart(2, '0')}:30`);
+                // NO 30-minute slots - hourly only per requirements
             }
         } else {
-            // Generate times from available slots
+            // Generate HOURLY times from available slots
             availableSlots.forEach(slot => {
                 const startHour = parseInt(slot.start_time.split(':')[0]);
                 const endHour = parseInt(slot.end_time.split(':')[0]);
@@ -398,9 +399,7 @@ const AppointmentRequests = {
                 for (let hour = startHour; hour < endHour; hour++) {
                     const time = `${hour.toString().padStart(2, '0')}:00`;
                     if (!times.includes(time)) times.push(time);
-                    
-                    const halfTime = `${hour.toString().padStart(2, '0')}:30`;
-                    if (!times.includes(halfTime) && hour < endHour - 1) times.push(halfTime);
+                    // NO 30-minute slots - hourly only per requirements
                 }
             });
         }
@@ -846,6 +845,13 @@ const AppointmentRequests = {
             created_at: new Date().toISOString()
         });
         localStorage.setItem('appointment_notifications', JSON.stringify(notifications));
+    },
+
+    // Get minimum booking date (tomorrow - no same-day booking)
+    getMinBookingDate() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
     },
 
     // Get Case Manager dashboard widget

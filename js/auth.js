@@ -157,6 +157,7 @@ const Auth = {
             admin: [
                 { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                 { id: 'patients', label: 'Patients', icon: 'users' },
+                { id: 'doctor-availability', label: 'Doctor Availability', icon: 'calendar' },
                 { id: 'appointment-requests', label: 'Appointment Requests', icon: 'clipboard' },
                 { id: 'refill-requests', label: 'Refill Requests', icon: 'pills' },
                 { id: 'appointments', label: 'Appointments', icon: 'calendar' },

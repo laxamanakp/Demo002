@@ -10,7 +10,7 @@ This document details the sidebar navigation menu items available for each user 
 
 | Role | Description | Menu Items |
 |------|-------------|------------|
-| **Admin** | System administrator with full access | 21 items |
+| **Admin** | System administrator with full access | 22 items |
 | **Physician** | Medical doctor providing care | 13 items |
 | **Nurse** | Nursing staff | 11 items |
 | **Case Manager** | Patient care coordinator | 11 items |
@@ -27,25 +27,26 @@ Full system access with all management capabilities.
 |---|-----------|------|-------|-------------|
 | 1 | Dashboard | 🏠 home | `#dashboard` | System overview & statistics |
 | 2 | Patients | 👥 users | `#patients` | Patient management |
-| 3 | ✨ **Appointment Requests** | 📋 clipboard | `#appointment-requests` | **NEW** - Review & approve appointment requests |
-| 4 | ✨ **Refill Requests** | 💊 pills | `#refill-requests` | **NEW** - Review & approve medication refills |
-| 5 | Appointments | 📅 calendar | `#appointments` | Appointment scheduling |
-| 6 | Clinical Visits | 📋 clipboard | `#visits` | Visit documentation |
-| 7 | Inventory | 📦 package | `#inventory` | Medication stock management |
-| 8 | Prescriptions | 📄 file-text | `#prescriptions` | Prescription management |
-| 9 | ART Regimens | 💊 pills | `#art-regimen` | HIV treatment regimens |
-| 10 | Vaccination Program | 💉 syringe | `#vaccinations` | Immunization tracking |
-| 11 | Lab Tests | 📊 activity | `#lab-tests` | Laboratory orders & results |
-| 12 | HTS Sessions | 🧪 test-tube | `#hts` | HIV Testing Services |
-| 13 | Counseling | 💬 message-circle | `#counseling` | Counseling sessions |
-| 14 | Referrals | 🔗 share | `#referrals` | Patient referrals |
-| 15 | Care Tasks | ✅ check-square | `#care-tasks` | Task management |
-| 16 | Satisfaction Surveys | ⭐ star | `#surveys` | Patient feedback |
-| 17 | User Management | 👤+ user-plus | `#users` | System users |
-| 18 | My Hub Cares Branches | 🏢 building | `#facilities` | Facility management |
-| 19 | Audit Trail | 🛡️ shield | `#audit` | Activity logs |
-| 20 | Reports | 📊 bar-chart | `#reports` | Analytics & reports |
-| 21 | Education | 📚 book | `#education` | Health education modules |
+| 3 | ✨ **Doctor Availability** | 📅 calendar | `#doctor-availability` | **NEW** - Assign doctors, manage conflicts & locks |
+| 4 | ✨ **Appointment Requests** | 📋 clipboard | `#appointment-requests` | **NEW** - Review & approve appointment requests |
+| 5 | ✨ **Refill Requests** | 💊 pills | `#refill-requests` | **NEW** - Review & approve medication refills |
+| 6 | Appointments | 📅 calendar | `#appointments` | Appointment scheduling |
+| 7 | Clinical Visits | 📋 clipboard | `#visits` | Visit documentation |
+| 8 | Inventory | 📦 package | `#inventory` | Medication stock management |
+| 9 | Prescriptions | 📄 file-text | `#prescriptions` | Prescription management |
+| 10 | ART Regimens | 💊 pills | `#art-regimen` | HIV treatment regimens |
+| 11 | Vaccination Program | 💉 syringe | `#vaccinations` | Immunization tracking |
+| 12 | Lab Tests | 📊 activity | `#lab-tests` | Laboratory orders & results |
+| 13 | HTS Sessions | 🧪 test-tube | `#hts` | HIV Testing Services |
+| 14 | Counseling | 💬 message-circle | `#counseling` | Counseling sessions |
+| 15 | Referrals | 🔗 share | `#referrals` | Patient referrals |
+| 16 | Care Tasks | ✅ check-square | `#care-tasks` | Task management |
+| 17 | Satisfaction Surveys | ⭐ star | `#surveys` | Patient feedback |
+| 18 | User Management | 👤+ user-plus | `#users` | System users |
+| 19 | My Hub Cares Branches | 🏢 building | `#facilities` | Facility management |
+| 20 | Audit Trail | 🛡️ shield | `#audit` | Activity logs |
+| 21 | Reports | 📊 bar-chart | `#reports` | Analytics & reports |
+| 22 | Education | 📚 book | `#education` | Health education modules |
 
 ---
 
@@ -147,7 +148,35 @@ Patient self-service portal.
 
 ## ✨ Recently Added Features
 
-### 1. Appointment Request Flow
+### 1. Doctor Availability Management
+**Added to:** Admin Only
+
+| Route | Description |
+|-------|-------------|
+| `#doctor-availability` | Admin assigns doctors to days, manages conflicts, and locks schedules |
+
+**Features:**
+- 📅 **Daily View**: Assign doctors to specific days with time slots
+- 📆 **Weekly Overview**: 7-day calendar showing all doctor assignments
+- ⚠️ **Conflicts & Agendas**: Record doctor unavailability (leave, meetings, training, etc.)
+- 🔒 **Lock Protection**: Lock schedules to prevent modifications by others
+- ⚙️ **Scheduling Settings**: Configure daily patient capacity, max slots per doctor, slot duration
+
+**Key Rules:**
+- No same-day booking (future dates only)
+- Hourly intervals only (no 30-minute slots)
+- Daily patient capacity limits
+- Maximum slots per doctor per day
+- Locked schedules cannot be edited except by Admin unlock
+
+**Flow:**
+```
+Admin → Assign Doctor to Day → Set Time/Facility → Optionally Lock → Creates Availability Slots
+```
+
+---
+
+### 2. Appointment Request Flow
 **Added to:** Admin, Case Manager
 
 | Route | Description |
@@ -156,12 +185,18 @@ Patient self-service portal.
 
 **Flow:**
 ```
-Patient → Request Appointment → Case Manager Reviews → Approve/Decline → Patient Notified
+Patient → Request Appointment (future date, hourly slots) → Case Manager Reviews → Approve/Decline → Patient Notified
 ```
+
+**Key Rules:**
+- No same-day booking (tomorrow minimum)
+- Hourly time slots only
+- Validates daily capacity and doctor max slots
+- Appointments sorted newest on top
 
 ---
 
-### 2. Medication Refill Request Flow
+### 3. Medication Refill Request Flow
 **Added to:** Admin, Case Manager
 
 | Route | Description |
@@ -170,12 +205,19 @@ Patient → Request Appointment → Case Manager Reviews → Approve/Decline →
 
 **Flow:**
 ```
-Patient → Request Refill → Case Manager Reviews (adherence, Rx validity) → Approve/Decline → Patient Notified
+Patient → Request Refill (with pill count) → System validates (kulang/sakto/sobra) → Case Manager Reviews → Approve/Decline → Patient Notified
 ```
+
+**Key Features:**
+- 📊 **Pill Count Input**: Patient must report remaining pills
+- 📉 **Kulang/Sakto/Sobra**: Automatic validation of pill status
+- ⚠️ **Kulang Explanation**: Required explanation when pills are insufficient
+- ✅ **10-Pill Eligibility**: Recommended refill when ≤10 pills remaining
+- 🚫 **No Doctor Selection**: Refills processed by Treatment Partner only
 
 ---
 
-### 3. My Medications (Combined View)
+### 4. My Medications (Combined View)
 **Added to:** Patient
 
 | Route | Description |
@@ -202,6 +244,7 @@ Patient → Request Refill → Case Manager Reviews (adherence, Rx validity) →
 |---------|:-----:|:---------:|:-----:|:------------:|:---:|:-------:|
 | Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Patients | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| ✨ Doctor Availability | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | ✨ Appointment Requests | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
 | ✨ Refill Requests | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Appointments | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
@@ -231,13 +274,25 @@ Patient → Request Refill → Case Manager Reviews (adherence, Rx validity) →
 |------|-------------|
 | `js/auth.js` | Navigation menu definitions (`getNavigationMenu()`) |
 | `js/app.js` | Route handling (`loadPage()`) |
+| `js/doctor-availability.js` | Admin doctor availability management module |
 | `js/appointment-requests.js` | Appointment request module |
-| `js/refill-requests.js` | Refill request module |
+| `js/refill-requests.js` | Refill request module (with pill count validation) |
+| `js/appointments.js` | Appointment scheduling (no same-day, hourly slots) |
 | `js/reminders.js` | Medication reminders + My Medications page |
 
 ---
 
-*Document Version: 1.0*  
-*Last Updated: November 25, 2025*
+## 📚 Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| `SYSTEM_REQUIREMENTS_IMPLEMENTATION.md` | Complete implementation details of all system requirements |
+| `APPOINTMENT_BOOKING_FLOW.md` | Detailed appointment booking workflow |
+| `REFILL_REQUEST_FLOW.md` | Detailed refill request workflow |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: December 2024*
 
 

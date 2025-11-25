@@ -174,7 +174,7 @@ const Appointments = {
         });
     },
 
-    // Render appointment list
+    // Render appointment list (sorted: newest on top, oldest at bottom per requirements)
     renderAppointmentList(appointments) {
         if (appointments.length === 0) {
             return '<p class="text-muted">No appointments found</p>';
@@ -185,7 +185,14 @@ const Appointments = {
         const users = JSON.parse(localStorage.getItem('users')) || [];
         const role = Auth.getCurrentUser().role;
 
-        return appointments.map(apt => {
+        // Sort appointments: newest on top, oldest at bottom (per requirements)
+        const sortedAppointments = [...appointments].sort((a, b) => {
+            const dateA = new Date(a.appointmentDate + 'T' + (a.appointmentTime || '00:00'));
+            const dateB = new Date(b.appointmentDate + 'T' + (b.appointmentTime || '00:00'));
+            return dateB - dateA; // Descending order (newest first)
+        });
+
+        return sortedAppointments.map(apt => {
             const patient = patients.find(p => p.id === apt.patientId);
             const facility = facilities.find(f => f.id === apt.facilityId);
             const provider = users.find(u => u.id === apt.providerId);
@@ -316,13 +323,17 @@ const Appointments = {
                 <div class="form-row">
                     <div class="form-group">
                         <label class="required">Date</label>
-                        <input type="date" id="appointmentDate" required min="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="appointmentDate" required min="${this.getMinBookingDate()}" onchange="Appointments.loadAvailableTimeSlots()">
+                        <small class="text-muted">⚠️ Same-day booking not allowed</small>
                     </div>
                     <div class="form-group">
-                        <label class="required">Time</label>
-                        <input type="time" id="appointmentTime" required>
+                        <label class="required">Time (Hourly)</label>
+                        <select id="appointmentTime" required>
+                            <option value="">Select date first</option>
+                        </select>
                     </div>
                 </div>
+                <div id="slotAvailabilityInfo" class="mb-2" style="display:none;"></div>
                 <div class="form-group">
                     <label class="required">MyHubCares Branch</label>
                     <select id="facilityId" required>
@@ -737,7 +748,163 @@ const Appointments = {
     },
 
     getDefaultDurationMinutes() {
-        return 30;
+        return 60; // Changed to 60 minutes (hourly intervals)
+    },
+
+    // Get minimum booking date (tomorrow - no same-day booking allowed)
+    getMinBookingDate() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+    },
+
+    // Load available hourly time slots based on date, provider, and facility
+    loadAvailableTimeSlots() {
+        const dateInput = document.getElementById('appointmentDate');
+        const providerSelect = document.getElementById('providerId');
+        const facilitySelect = document.getElementById('facilityId');
+        const timeSelect = document.getElementById('appointmentTime');
+        const infoDiv = document.getElementById('slotAvailabilityInfo');
+
+        if (!dateInput || !timeSelect) return;
+
+        const date = dateInput.value;
+        const providerId = providerSelect ? parseInt(providerSelect.value) : null;
+        const facilityId = facilitySelect ? parseInt(facilitySelect.value) : null;
+
+        if (!date) {
+            timeSelect.innerHTML = '<option value="">Select date first</option>';
+            if (infoDiv) infoDiv.style.display = 'none';
+            return;
+        }
+
+        // Get system settings for capacity
+        const settings = this.getSchedulingSettings();
+        
+        // Get availability slots for this provider/facility/date
+        const slots = JSON.parse(localStorage.getItem('availability_slots')) || [];
+        const availableSlots = slots.filter(slot =>
+            (!providerId || slot.provider_id === providerId) &&
+            (!facilityId || slot.facility_id === facilityId) &&
+            slot.slot_date === date &&
+            slot.slot_status === 'available'
+        );
+
+        // Get existing appointments for this date to check capacity
+        const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+        const dateAppointments = appointments.filter(apt => 
+            apt.appointmentDate === date && 
+            apt.status !== 'cancelled' &&
+            (!providerId || apt.providerId === providerId)
+        );
+
+        // Check daily patient capacity
+        const dailyCount = dateAppointments.length;
+        const capacityReached = dailyCount >= settings.maxPatientsPerDay;
+
+        // Check doctor's max slots
+        let doctorSlotsReached = false;
+        if (providerId) {
+            const doctorAppointments = dateAppointments.filter(apt => apt.providerId === providerId);
+            doctorSlotsReached = doctorAppointments.length >= settings.maxSlotsPerDoctor;
+        }
+
+        // Generate hourly time options
+        let options = '<option value="">Select Time</option>';
+        const hourlySlots = this.generateHourlyTimeSlots(availableSlots, dateAppointments);
+
+        if (capacityReached) {
+            if (infoDiv) {
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = '<div class="alert alert-warning">⚠️ Maximum daily patient capacity reached for this date. Please select another date.</div>';
+            }
+            timeSelect.innerHTML = '<option value="">No slots available - capacity reached</option>';
+            return;
+        }
+
+        if (doctorSlotsReached) {
+            if (infoDiv) {
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = '<div class="alert alert-warning">⚠️ This doctor has reached maximum appointments for this date.</div>';
+            }
+            timeSelect.innerHTML = '<option value="">No slots available - doctor fully booked</option>';
+            return;
+        }
+
+        if (hourlySlots.length === 0) {
+            if (infoDiv) {
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = '<div class="alert alert-info">ℹ️ No available slots configured for this date. Contact admin.</div>';
+            }
+            // Provide default business hours
+            for (let hour = 8; hour <= 17; hour++) {
+                const time = `${hour.toString().padStart(2, '0')}:00`;
+                options += `<option value="${time}">${this.formatTimeDisplay(time)}</option>`;
+            }
+        } else {
+            if (infoDiv) {
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = `<div class="alert alert-success">✅ ${hourlySlots.length} available slot(s) | Daily: ${dailyCount}/${settings.maxPatientsPerDay} patients</div>`;
+            }
+            hourlySlots.forEach(time => {
+                options += `<option value="${time}">${this.formatTimeDisplay(time)}</option>`;
+            });
+        }
+
+        timeSelect.innerHTML = options;
+    },
+
+    // Generate hourly time slots only (per requirement)
+    generateHourlyTimeSlots(availableSlots, existingAppointments) {
+        const times = new Set();
+        
+        // Get booked times
+        const bookedTimes = existingAppointments.map(apt => apt.appointmentTime);
+
+        if (availableSlots.length === 0) {
+            // Default business hours if no slots defined
+            for (let hour = 8; hour <= 17; hour++) {
+                const time = `${hour.toString().padStart(2, '0')}:00`;
+                if (!bookedTimes.includes(time)) {
+                    times.add(time);
+                }
+            }
+        } else {
+            // Generate hourly times from available slots
+            availableSlots.forEach(slot => {
+                const startHour = parseInt(slot.start_time.split(':')[0]);
+                const endHour = parseInt(slot.end_time.split(':')[0]);
+                
+                for (let hour = startHour; hour < endHour; hour++) {
+                    const time = `${hour.toString().padStart(2, '0')}:00`;
+                    if (!bookedTimes.includes(time)) {
+                        times.add(time);
+                    }
+                }
+            });
+        }
+        
+        return Array.from(times).sort();
+    },
+
+    // Format time for display (e.g., "09:00" -> "9:00 AM")
+    formatTimeDisplay(time) {
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+    },
+
+    // Get scheduling settings
+    getSchedulingSettings() {
+        const settings = JSON.parse(localStorage.getItem('scheduling_settings')) || {};
+        return {
+            maxPatientsPerDay: settings.maxPatientsPerDay || 20,
+            maxSlotsPerDoctor: settings.maxSlotsPerDoctor || 8,
+            allowSameDayBooking: false, // Always false per requirements
+            slotDurationMinutes: 60 // Hourly only
+        };
     }
 };
 
